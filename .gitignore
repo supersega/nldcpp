@@ -3,4 +3,4 @@ build/
 doc/
 .DS_Store
 CMakeCache.txt
-
+CMakeFiles/

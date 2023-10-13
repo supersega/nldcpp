@@ -319,6 +319,25 @@ auto find_roots(auto fn, Interval interval, size_t discretization) {
     return roots;
 }
 
+auto normalized_mode(auto fn) {
+    double max = fn(0.0);
+    double min = fn(0.0);
+
+    size_t N = 100;
+    for (size_t i = 1; i < N + 1; i++) {
+        auto xi = (double)i / (double)(N);
+        auto value = fn(xi);
+        if (value > max)
+            max = value;
+        else if (value < min)
+            min = value;
+    }
+
+    auto abs_max = std::max(max, std::abs(min));
+
+    return [fn, abs_max](auto xi) mutable { return fn(xi) / abs_max; };
+}
+
 auto make_eigen_mode_ch(CrackedBeam cracked_beam, int index) {
     auto eigen_frequences_equation = make_chc_bf(cracked_beam);
     auto alphai =
@@ -335,7 +354,9 @@ auto make_eigen_mode_ch(CrackedBeam cracked_beam, int index) {
         return aux;
     };
 
-    return em;
+    auto normalized = normalized_mode(em);
+
+    return normalized;
 }
 
 auto make_eigen_mode_hc(CrackedBeam cracked_beam, int index) {
