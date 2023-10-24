@@ -321,7 +321,7 @@ auto afc(std::size_t i) {
             damage{3.0 / 4.0 * geometry.length, coeff * geometry.height}, load,
             friction, 40, 3, bc2);
 
-        continuation_parameters params(newton_parameters(100, 0.0005), 4.9,
+        continuation_parameters params(newton_parameters(100, 0.0005), 2.9,
                                        0.001, 0.01, direction::forward);
 
         auto ip = periodic_parameters{1, 300};

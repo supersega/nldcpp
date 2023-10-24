@@ -2,10 +2,14 @@
 constexpr auto PI = 3.14159265358979323846264338327950288;
 #include <fstream>
 #include <iostream>
+#include <vector>
 using namespace std;
 
 #include <nld/autocont.hpp>
 using namespace nld;
+
+#include <matplotlibcpp.h>
+namespace plt = matplotlibcpp;
 
 vector_xdd2 NLTVA(const vector_xdd2 &y, dual2 t, const vector_xdd2 &params) {
     vector_xdd2 dy(4);
@@ -47,8 +51,8 @@ vector_xdd2 NLTVA(const vector_xdd2 &y, dual2 t, const vector_xdd2 &params) {
 }
 
 int main() {
-    continuation_parameters params(newton_parameters(25, 0.00001), 26.5, 0.003,
-                                   0.001, direction::forward);
+    continuation_parameters params(newton_parameters(25, 0.0001), 15.5, 0.01,
+                                   0.01, direction::reverse);
 
     auto ip = periodic_parameters{1, 200};
     auto snb = saddle_node<runge_kutta_4>(non_autonomous(NLTVA), ip);
@@ -60,13 +64,22 @@ int main() {
     vector_xdd2 v0(10);
     v0 << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0;
 
-    ofstream fs("afc_loop.csv");
-    fs << 'x' << ';' << 'y' << endl;
+    ofstream fs("saddle_node.txt", std::ofstream::trunc);
 
+    std::vector<double> Ai;
+    std::vector<double> A0i;
     for (auto [s, A0] : arc_length(snb, params, u0, v0,
                                    concat(solution(), mean_amplitude(0)))) {
-        auto A = s(8);
+        auto A = s(9);
+        auto Omega = s(8);
         std::cout << "Solution = \n" << A << endl;
-        fs << A << ';' << A0 << endl;
+        fs << A << ' ' << A0 << ' ' << Omega << endl;
+        Ai.push_back(static_cast<double>(Omega));
+        A0i.push_back(static_cast<double>(A0));
     }
+
+    plt::ylabel(R"($A_1$)");
+    plt::xlabel(R"($f_0$)");
+    plt::named_plot("Saddle Node", Ai, A0i, "-b");
+    plt::show();
 }

@@ -3,11 +3,14 @@ constexpr auto PI = 3.14159265358979323846264338327950288;
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <vector>
 using namespace std;
 
 #include <nld/autocont.hpp>
 using namespace nld;
 
+#include <matplotlibcpp.h>
+namespace plt = matplotlibcpp;
 vector_xdd NLTVA(const vector_xdd &y, dual t, dual Omega) {
     vector_xdd dy(4);
 
@@ -47,95 +50,93 @@ vector_xdd NLTVA(const vector_xdd &y, dual t, dual Omega) {
     return dy;
 }
 
+vector_xdd weakly_nonlinear_system(const vector_xdd &y, dual Omega) {
+    vector_xdd dy(4);
+
+    dy[0] = y[2];
+    dy[1] = y[3];
+    dy[2] = -1.0 * (2.0 * y[0] - y[1] + 0.5 * y[0] * y[0] * y[0]);
+    dy[3] = -1.0 * (2.0 * y[1] - (1.0) * y[0]);
+
+    return dy;
+}
+
+auto duffing_autonomous(const vector_xdd &y, dual omega) {
+    vector_xdd dy(4);
+
+    double c = 0.01;
+    double k = 1.0;
+    double alpha = 0.7;
+    double A = 3.0;
+
+    dy(0) = y(1);
+    dy(1) = -k * y(0) - c * y(1) - alpha * y(0) * y(0) * y(0) + A * y(3);
+    dy(2) = y(2) + omega * y(3) - y(2) * (y(2) * y(2) + y(3) * y(3));
+    dy(3) = -omega * y(2) + y(3) - y(3) * (y(2) * y(2) + y(3) * y(3));
+
+    return dy;
+}
+
+auto predator_prey(const vector_xdd &z, dual p1) {
+    vector_xdd dz(2);
+
+    auto u1 = z[0];
+    auto u2 = z[1];
+    auto p2 = 3.0;
+    auto p3 = 5.0;
+    auto p4 = 4.0;
+
+    dz[0] = p2 * u1 * (1 - u1) - u1 * u2 - p1 * (1 - exp(-p3 * u1));
+    dz[1] = -u2 + p4 * u1 * u2;
+
+    return dz;
+}
+
+auto simple_system_3(const vector_xdd &u, dual t, dual T) {
+    vector_xdd f(2);
+
+    f[0] = 0 - u[1];
+    f[1] = u[0] - u[0] * u[0];
+
+    f *= T;
+
+    return f;
+}
+
 int main() {
     ofstream fs("afc_loop.csv");
     fs << 'x' << ';' << 'y' << endl;
 
-    continuation_parameters params(newton_parameters(25, 0.00001), 26.5, 0.003,
+    continuation_parameters params(newton_parameters(25, 0.00001), 2.1, 0.003,
                                    0.001, direction::forward);
 
     auto ip = periodic_parameters{1, 200};
-    auto bvp = periodic<runge_kutta_4>(non_autonomous(NLTVA), ip);
+    auto bvp = periodic<runge_kutta_4>(non_autonomous(simple_system_3), ip);
 
-    vector_xdd u0(5);
-    u0 << 0.0, 0.0, 0.0, 0.0, 0.3;
+    vector_xdd u0(3);
+    u0 << 0.0966822, 0.0, 6.30641;
 
-    vector_xdd v0(5);
-    v0 << 0.0, 0.0, 0.0, 0.0, 1.0;
+    vector_xdd v0(3);
+    v0 << 0.0, 0.0, 1.0;
 
+    std::vector<double> Am;
+    std::vector<double> L;
     std::cout << "Start\n";
-    vector_xdd u1(5);
     for (auto [solution, monodromy, amplitude] :
          arc_length(bvp, params, u0, v0,
                     concat(solution(), monodromy(), mean_amplitude(0)))) {
-        auto frequency = solution(solution.size() - 1);
+        auto period = solution(solution.size() - 1);
+        std::cout << solution << std::endl;
+        std::cout << "Frq: " << period << " Amplitude: " << amplitude
+                  << std::endl;
 
-        Eigen::EigenSolver<Eigen::MatrixXd> es(monodromy);
-        auto ev = es.eigenvalues();
-        vector_xd r = ev.real().array().pow(2) + ev.imag().array().pow(2);
-        nld::index i = 0;
-        auto is_saddle_node = false;
-        for (i = 0; i < ev.size(); i++) {
-            is_saddle_node = (std::abs(ev(i).real() - 1.0) < 1.0e-3) &&
-                             (std::abs(ev(i).imag()) < 1.0e-3);
-            if (is_saddle_node)
-                break;
-        }
-
-        if (is_saddle_node) {
-            vector_xd e_vector = es.eigenvectors().real().col(i);
-            vector_xd wwww = monodromy * e_vector - e_vector;
-            cout << "Saddle node: eigen vectors are - \n"
-                 << es.eigenvectors().col(i) << '\n';
-            cout << "Saddle node: variables are - \n" << wwww << '\n';
-        }
-
-        cout << ((r.array() < 1.0).all() ? "stable" : "unstable") << endl;
-        cout << frequency << endl;
-        fs << frequency << ';' << amplitude << endl;
-    }
-    std::cout << "u1: \n" << u1;
-
-    auto parameter = u1(4);
-
-    auto bvp2 = periodic<runge_kutta_4>(non_autonomous(NLTVA), ip);
-    auto wrpd = [&bvp2, u1, parameter](const auto &vs) {
-        vector_xdd values(5);
-
-        values.head(4) = vs.head(4);
-        values(4) = parameter;
-        vector_xdd aux = vs.head(4) - u1.head(4);
-        dual M = (1.0 / aux.lpNorm<2>());
-
-        vector_xdd res = M * bvp2(values);
-        return res;
+        Am.push_back(double(amplitude));
+        L.push_back(double(period));
     };
 
-    nld::vector_xdd known = nld::vector_xdd::Ones(5);
-    known(4) = 0.0;
-    known.normalize();
-    // x0 << 1.28826 , -1.28716, 2.62268, -0.693648, 1.90048;
-
-    newton_homotopy homotopy(wrpd, known);
-
-    nld::vector_xdd unknown(5);
-    unknown << nld::vector_xdd::Ones(4), parameter;
-
-    nld::vector_xdd tan = nld::vector_xdd::Zero(5);
-    tan(4) = 1.0;
-
-    for (auto value : arc_length(homotopy, params, known, tan, solution())) {
-        auto kappa = value(4);
-        std::cout << "kappa:" << kappa << endl;
-        // fs << kappa << ';' << value(1) << endl;
-        unknown.head(4) = value.head(4);
-        if (abs(kappa - 1.0) < 1.0e-3) {
-            break;
-        }
-    }
-
-    for (auto [p, v] : arc_length(bvp, params, unknown, v0, half_swing(0))) {
-        std::cout << p << ';' << v << endl;
-        fs << p << ';' << v << endl;
-    }
+    plt::ylabel(R"($A_1$)");
+    plt::xlabel(R"($T$)");
+    plt::xlim(6.25, 8.0);
+    plt::named_plot("Saddle Node", L, Am, "-b");
+    plt::show();
 }
