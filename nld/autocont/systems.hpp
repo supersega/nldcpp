@@ -5,6 +5,34 @@
 #include <type_traits>
 
 namespace nld {
+namespace concepts::non_autonomous {
+template <typename F>
+concept RnToRnMap = requires(F f) {
+    {
+        f(std::declval<nld::utils::any_type>(),
+          std::declval<nld::utils::any_type>())
+    } -> Vector;
+};
+
+template <typename F>
+concept RnPlusOneToRnMap = requires(F f) {
+    {
+        f(std::declval<nld::utils::any_type>(),
+          std::declval<nld::utils::any_type>(),
+          std::declval<nld::utils::any_type>())
+    } -> Vector;
+};
+
+template <RnToRnMap Fn>
+auto call_fn() -> decltype(std::declval<Fn>()(nld::utils::any_type{},
+                                              nld::utils::any_type{}));
+
+template <RnPlusOneToRnMap Fn>
+auto call_fn() -> decltype(std::declval<Fn>()(nld::utils::any_type{},
+                                              nld::utils::any_type{},
+                                              nld::utils::any_type{}));
+} // namespace concepts::non_autonomous
+
 /// @brief Non autonomous dynamic system
 /// Function should have signature f(u, t, lambda) where:
 /// u - vector of unknown variables
@@ -12,24 +40,43 @@ namespace nld {
 /// lambda - continuation parameter
 template <typename Fn>
 struct non_autonomous final {
-    /// TODO: implement it
+    /// TODO: investigate if continuation wrt non period requires
+    /// Integral-Phase cindition, and make better name.
     static constexpr bool is_continuation_wrt_period = true;
 
-    using vector_t = decltype(std::declval<Fn>()(nld::utils::any_type{},
-                                                 nld::utils::any_type{},
-                                                 nld::utils::any_type{}));
+    using vector_t = decltype(concepts::non_autonomous::call_fn<Fn>());
 
     /// @brief Make non autonomous system.
     explicit non_autonomous(Fn f) : function(f) {}
 
     /// @brief Operator to wrap function for earthier usage.
+    /// @details For now assume that Period or frequence is passed
+    /// explicitly, e.g. y' = f(t, t, T).
     /// @param y State variables for ODE.
     /// @param t Time.
     /// @param parameters Parameters for continuation.
     /// @returns Value of ODE right side at given point, time, parameters.
     template <typename T, typename S, typename P>
-    auto operator()(const T &y, S t, P parameters) const {
+    auto operator()(const T &y, S t, P parameters) const
+        requires concepts::non_autonomous::RnPlusOneToRnMap<Fn>
+    {
         return function(y, t, parameters);
+    }
+
+    /// @brief Operator to wrap function for earthier usage.
+    /// @details Wrap syster y' = f(y, t),
+    /// assuming continuation wrt period.
+    /// @param y State variables for ODE.
+    /// @param t Time.
+    /// @param T Period.
+    /// @returns Value of ODE right side at given point, time, parameters.
+    template <typename Ty, typename S, typename P>
+    auto operator()(const Ty &y, S t, P T) const
+        requires concepts::non_autonomous::RnToRnMap<Fn>
+    {
+        auto result = function(y, t);
+        result *= T;
+        return result;
     }
 
 private:
