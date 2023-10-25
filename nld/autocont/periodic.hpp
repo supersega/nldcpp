@@ -14,11 +14,7 @@ namespace nld {
 namespace internal {
 
 template <typename Ds>
-concept AutonomousAndContinuationNotWrtPeriod =
-    is_autonomous_v<Ds> && !Ds::is_continuation_wrt_period;
-
-template <typename Ds>
-concept ContinuationWrtPeriod = Ds::is_continuation_wrt_period;
+concept PoincareEquationNeeded = Ds::is_poincare_equation_needed;
 
 template <OdeSolver S, typename Ds>
 struct periodic;
@@ -81,7 +77,7 @@ public:
     template <typename Vector>
     auto ode(const Vector &variables) const {
         using namespace std::placeholders;
-        if constexpr (ContinuationWrtPeriod<Ds>) {
+        if constexpr (!PoincareEquationNeeded<Ds>) {
             auto parameter = variables(variables.size() - 1);
             auto ds = std::bind(this->underlying_function(), _1, _2, parameter);
             Vector state = variables.head(variables.size() - 1);
@@ -104,7 +100,7 @@ public:
     /// @param variables Initial conditions for ODE.
     template <typename Vector>
     Vector operator()(const Vector &variables) const
-        requires ContinuationWrtPeriod<Ds>
+        requires(!PoincareEquationNeeded<Ds>)
     {
         auto [state, args] = integration_arguments(variables, *this);
         return solver_t::end_solution(this->underlying_function(), parameters,
@@ -118,7 +114,7 @@ public:
     /// @param variables Initial conditions for ODE.
     template <typename Vector>
     Vector operator()(const Vector &variables) const
-        requires AutonomousAndContinuationNotWrtPeriod<Ds>
+        requires PoincareEquationNeeded<Ds>
     {
         auto dim = variables.size();
         Vector result(dim - 1);
@@ -148,7 +144,7 @@ public:
     /// @returns Number of non state variables, non autonomous (lambda),
     /// autonomous (T, lambda)
     static constexpr index non_state_variables() {
-        return ContinuationWrtPeriod<Ds> ? 1 : 2;
+        return PoincareEquationNeeded<Ds> ? 2 : 1;
     }
 
 private:
@@ -159,7 +155,7 @@ template <typename S, typename Fn, typename V>
 auto integration_arguments(
     const V &variables,
     [[maybe_unused]] const nld::internal::periodic<S, Fn> &pc) {
-    if constexpr (ContinuationWrtPeriod<Fn>) {
+    if constexpr (!PoincareEquationNeeded<Fn>) {
         auto dim = variables.size();
         V state = variables.head(variables.size() - 1);
         auto parameter = variables(dim - 1);

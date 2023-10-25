@@ -42,7 +42,7 @@ template <typename Fn>
 struct non_autonomous final {
     /// TODO: investigate if continuation wrt non period requires
     /// Integral-Phase cindition, and make better name.
-    static constexpr bool is_continuation_wrt_period = true;
+    static constexpr bool is_poincare_equation_needed = false;
 
     using vector_t = decltype(concepts::non_autonomous::call_fn<Fn>());
 
@@ -122,8 +122,8 @@ auto call_fn() -> decltype(std::declval<Fn>()(nld::utils::any_type{},
 template <typename Fn>
 struct autonomous final {
     /// @brief indentify if period is a continuation parameter
-    static constexpr bool is_continuation_wrt_period =
-        concepts::autonomous::RnToRnMap<Fn>;
+    static constexpr bool is_poincare_equation_needed =
+        concepts::autonomous::RnPlusOneToRnMap<Fn>;
 
     using vector_t = decltype(concepts::autonomous::call_fn<Fn>());
 
