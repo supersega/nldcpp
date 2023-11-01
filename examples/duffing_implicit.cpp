@@ -15,7 +15,7 @@ namespace plt = matplotlibcpp;
 vector_xdd duffing(const vector_xdd &y, dual t) {
     vector_xdd dy(y.size());
 
-    dual t8 = cos(t);
+    dual t8 = cos(2.0 * PI * t);
 
     dy[0] = y[1];
     dy[1] = -0.1e-1 * y[1] - 0.1000000000e1 * y[0] -

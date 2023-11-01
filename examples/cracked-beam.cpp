@@ -1,4 +1,5 @@
 // C++ includes
+#include "nld/core/aliases.hpp"
 constexpr auto PI = 3.14159265358979323846264338327950288;
 #include <cmath>
 #include <fstream>
@@ -153,6 +154,7 @@ struct cracked_flexible_beam_dynamic_system final {
         auto Tnc = integral(rho * A * Unc * Unc, domain);
         auto [Mnc] = calculator.calculate(Tnc);
         Eigen::Map<nld::matrix_xd> massnc(Mnc.data(), dofs, dofs);
+
         nld::matrix_xd Mncinv_matrix = massnc.inverse();
         auto nl_term_no_crack = integral(
             integral(diff(Unc, autodiff::wrt(x)) * diff(Unc, autodiff::wrt(x)),
@@ -162,9 +164,11 @@ struct cracked_flexible_beam_dynamic_system final {
         auto [nl_tensor_no_crack] = calculator.calculate(nl_term_no_crack);
 
         auto Omega0nc = efnc.minCoeff();
+
         Omeganc = efnc / Omega0nc;
         auto Gnc0 = (E * A / 2.0 / l) * h * h / Omega0nc / Omega0nc *
                     nl_tensor_no_crack;
+
         Gnc = Gnc0.contract(nld::utils::tensor_view(Mncinv_matrix), dimensions);
         nld::tensor<1> Fnct =
             F *
@@ -212,7 +216,7 @@ struct cracked_flexible_beam_dynamic_system final {
         Fc = Eigen::Map<nld::vector_xd>(Fct.data(), dofs);
 
         auto displacement_in_crack =
-            integral(Unc * delta_function(load.position), domain);
+            integral(laplacian(Unc) * delta_function(load.position), domain);
         auto [Uxct] = calculator.calculate(displacement_in_crack);
         nld::vector_xd Uxc = Eigen::Map<nld::vector_xd>(Uxct.data(), dofs);
 
@@ -311,7 +315,7 @@ auto afc(std::size_t i) {
     physics material{2.1e11, 7800};
     force load{geometry.length / 2.0, 4'000.0};
     double friction = 0.1;
-    double coeff = 0.3 * i;
+    double coeff = 0.4 * i;
     hinged_beam_bc bc(geometry.length);
     clampted_hinged_beam_bc bc2(geometry.length);
 
@@ -336,8 +340,12 @@ auto afc(std::size_t i) {
         std::cout << "Start\n";
 
         std::vector<double> Omega, A1;
-        std::ofstream curve("curve.txt", std::ofstream::trunc);
-        std::ofstream pd("pd.txt", std::ofstream::trunc);
+        std::ofstream curve(
+            "/Volumes/Data/phd2023/compare_models_30_10_2023/curve_shen.txt",
+            std::ofstream::trunc);
+        std::ofstream pd(
+            "/Volumes/Data/phd2023/compare_models_30_10_2023/pd_shen.txt",
+            std::ofstream::trunc);
         for (auto [solution, M, A] :
              arc_length(bvp, params, u0,
                         concat(solution(), monodromy(), mean_amplitude(0)))) {

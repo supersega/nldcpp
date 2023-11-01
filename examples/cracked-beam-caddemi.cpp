@@ -1,16 +1,24 @@
 #include "nld/core/aliases.hpp"
+#include "nld/core/arguments.hpp"
+#include "nld/math/runge_kutta4.hpp"
+#include "nld/math/runge_kutta_parameters.hpp"
+constexpr auto PI = 3.14159265358979323846264338327950288;
 #include "nld/math/gauss_kronrod21.hpp"
 #include "nld/math/integrate.hpp"
+#include "nld/math/newton.hpp"
 #include "nld/math/segment.hpp"
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <fstream>
 #include <iostream>
 #include <iterator>
 #include <matplotlibcpp.h>
+#include <ostream>
 #include <sys/wait.h>
 #include <vector>
 
+#include <nld/autocont.hpp>
 #include <nld/math.hpp>
 
 namespace plt = matplotlibcpp;
@@ -21,6 +29,14 @@ struct Material {
 };
 
 struct Geometry {
+    auto area() const -> double { return height * width; }
+    auto inertia() const -> double {
+        auto b = width / 2.0;
+        auto h = height / 2.0;
+        auto I = 4.0 / 3.0 * b * h * h * h;
+        return I;
+    }
+
     double length;
     double height;
     double width;
@@ -41,15 +57,15 @@ struct Interval {
     double end;
 };
 
-double S(double alpha, double xi, double xi0) {
+auto S(auto alpha, double xi, double xi0) -> decltype(alpha) {
     return sin(alpha * (xi - xi0)) + sinh(alpha * (xi - xi0));
 }
 
-double dS(double alpha, double xi, double xi0) {
+auto dS(auto alpha, double xi, double xi0) -> decltype(alpha) {
     return (alpha) * (cos(alpha * (xi - xi0)) + cosh(alpha * (xi - xi0)));
 }
 
-double ddS(double alpha, double xi, double xi0) {
+auto ddS(auto alpha, double xi, double xi0) -> decltype(alpha) {
     return (alpha * alpha) *
            (-sin(alpha * (1 - xi0)) + sinh(alpha * (1 - xi0)));
 }
@@ -67,7 +83,7 @@ struct CrackedBeam {
     std::vector<Crack> cracks;
 
 private:
-    std::vector<double> __bettai() {
+    std::vector<double> __bettai() const {
         double h = beam.geometry.height;
         std::vector<double> bettaarray;
         for (const auto &crack : cracks) {
@@ -77,7 +93,7 @@ private:
     }
 
 public:
-    std::vector<double> lambdai() {
+    std::vector<double> lambdai() const {
         std::vector<double> bi = __bettai();
 
         auto C = [](double betta) -> double {
@@ -97,7 +113,7 @@ public:
         auto lambdaa = [&](double betta) {
             double h = beam.geometry.height;
             double L = beam.geometry.length;
-            return (h / L) * C_0(betta);
+            return (h / L) * C(betta);
         };
 
         std::vector<double> li;
@@ -108,45 +124,46 @@ public:
         return li;
     }
 
-    std::vector<std::function<double(double)>> mui() {
-        auto mu0 = [&](double alpha) {
+    std::vector<std::function<nld::dual(nld::dual)>> mui() const {
+        auto mu0 = [&](nld::dual alpha) -> nld::dual {
             double ksi0 = cracks[0].position / beam.geometry.length;
             return -(pow(alpha, 2)) * sin(alpha * ksi0);
         };
 
-        std::vector<std::function<double(double)>> mui_local;
+        std::vector<std::function<nld::dual(nld::dual)>> mui_local;
         mui_local.push_back(mu0);
         return mui_local;
     }
 
-    std::vector<std::function<double(double)>> upsiloni() {
-        auto upsilon0 = [this](double alpha) {
+    std::vector<std::function<nld::dual(nld::dual)>> upsiloni() const {
+        auto upsilon0 = [this](nld::dual alpha) -> nld::dual {
             double ksi0 = this->cracks[0].position / this->beam.geometry.length;
-            return -(std::pow(alpha, 2)) * std::cos(alpha * ksi0);
+            return -(pow(alpha, 2)) * cos(alpha * ksi0);
         };
-        std::vector<std::function<double(double)>> upsiloni_local = {upsilon0};
+        std::vector<std::function<nld::dual(nld::dual)>> upsiloni_local = {
+            upsilon0};
         return upsiloni_local;
     }
 
-    std::vector<std::function<double(double)>> zetai() {
-        auto zeta0 = [this](double alpha) {
+    std::vector<std::function<nld::dual(nld::dual)>> zetai() const {
+        auto zeta0 = [this](nld::dual alpha) -> nld::dual {
             double ksi0 = this->cracks[0].position / this->beam.geometry.length;
-            return std::pow(alpha, 2) * std::sinh(alpha * ksi0);
+            return pow(alpha, 2) * sinh(alpha * ksi0);
         };
-        std::vector<std::function<double(double)>> zetai_local = {zeta0};
+        std::vector<std::function<nld::dual(nld::dual)>> zetai_local = {zeta0};
         return zetai_local;
     }
 
-    std::vector<std::function<double(double)>> etai() {
-        auto eta0 = [this](double alpha) {
+    std::vector<std::function<nld::dual(nld::dual)>> etai() const {
+        auto eta0 = [this](nld::dual alpha) -> nld::dual {
             double ksi0 = this->cracks[0].position / this->beam.geometry.length;
-            return std::pow(alpha, 2) * std::cosh(alpha * ksi0);
+            return pow(alpha, 2) * cosh(alpha * ksi0);
         };
-        std::vector<std::function<double(double)>> etai_local = {eta0};
+        std::vector<std::function<nld::dual(nld::dual)>> etai_local = {eta0};
         return etai_local;
     }
 
-    std::vector<double> cracks_positions_dimless() {
+    std::vector<double> cracks_positions_dimless() const {
         std::vector<double> poss;
         for (auto crack : this->cracks) {
             poss.push_back(crack.position);
@@ -157,137 +174,147 @@ public:
         return poss;
     }
 
-    double A(double alpha, double xi) {
+    auto A(auto alpha, double xi) const -> decltype(alpha) {
         std::vector<double> lambdai = this->lambdai();
         int n = this->cracks.size();
         auto mui = this->mui();
         auto xii = this->cracks_positions_dimless();
-        auto sum = 0.0;
+        decltype(alpha) sum = 0.0;
         for (int i = 0; i < n; i++) {
-            sum += (lambdai[i] * mui[i](alpha) * S(alpha, xi, xii[i]) *
+            auto mu = static_cast<decltype(alpha)>(mui[i](alpha));
+            sum += (lambdai[i] * mu * S(alpha, xi, xii[i]) *
                     heaviside(xi, xii[i]));
         }
-        return (0.5 / alpha) * sum + std::sin(alpha * xi);
+        return (0.5 / alpha) * sum + sin(alpha * xi);
     }
 
-    double B(double alpha, double xi) {
+    auto B(auto alpha, double xi) const -> decltype(alpha) {
         std::vector<double> lambdai = this->lambdai();
         int n = this->cracks.size();
         auto upsiloni = this->upsiloni();
         auto xii = this->cracks_positions_dimless();
-        auto sum = 0.0;
+        decltype(alpha) sum = 0.0;
         for (int i = 0; i < n; i++) {
-            sum += (lambdai[i] * upsiloni[i](alpha) * S(alpha, xi, xii[i]) *
+            auto upsilon = static_cast<decltype(alpha)>(upsiloni[i](alpha));
+            sum += (lambdai[i] * upsilon * S(alpha, xi, xii[i]) *
                     heaviside(xi, xii[i]));
         }
         return (0.5 / alpha) * sum + cos(alpha * xi);
     }
 
-    double C(double alpha, double xi) {
+    auto C(auto alpha, double xi) const -> decltype(alpha) {
         auto lambdai = this->lambdai();
         int n = this->cracks.size();
         auto zetai = this->zetai();
         auto xii = this->cracks_positions_dimless();
-        auto sum = 0.0;
+        decltype(alpha) sum = 0.0;
         for (int i = 0; i < n; i++) {
-            sum += (lambdai[i] * zetai[i](alpha) * S(alpha, xi, xii[i]) *
+            auto zeta = static_cast<decltype(alpha)>(zetai[i](alpha));
+            sum += (lambdai[i] * zeta * S(alpha, xi, xii[i]) *
                     heaviside(xi, xii[i]));
         }
         return (0.5 / alpha) * sum + sinh(alpha * xi);
     }
 
-    double D(double alpha, double xi) {
+    auto D(auto alpha, double xi) const -> decltype(alpha) {
         auto lambdai = this->lambdai();
         int n = this->cracks.size();
         auto etai = this->etai();
         auto xii = this->cracks_positions_dimless();
-        auto sum = 0.0;
+        decltype(alpha) sum = 0.0;
         for (int i = 0; i < n; i++) {
-            sum += (lambdai[i] * etai[i](alpha) * S(alpha, xi, xii[i]) *
+            auto eta = static_cast<decltype(alpha)>(etai[i](alpha));
+            sum += (lambdai[i] * eta * S(alpha, xi, xii[i]) *
                     heaviside(xi, xii[i]));
         }
         return (0.5 / alpha) * sum + cosh(alpha * xi);
     }
 
-    double dA(double alpha, double xi) {
+    auto dA(auto alpha, double xi) const -> decltype(alpha) {
         auto lambdai = this->lambdai();
         auto n = this->cracks.size();
         auto mui = this->mui();
         auto xii = this->cracks_positions_dimless();
-        auto sum = 0.0;
+        decltype(alpha) sum = 0.0;
         for (int i = 0; i < n; i++) {
-            sum += lambdai[i] * mui[i](alpha) * dS(alpha, xi, xii[i]);
+            auto mu = static_cast<decltype(alpha)>(mui[i](alpha));
+            sum += lambdai[i] * mu * dS(alpha, xi, xii[i]);
         }
         return (0.5 / alpha) * sum + (alpha)*cos(alpha * xi);
     }
 
-    double dC(double alpha, double xi) {
+    auto dC(auto alpha, double xi) const -> decltype(alpha) {
         auto lambdai = this->lambdai();
         auto n = this->cracks.size();
         auto zetai = this->zetai();
         auto xii = this->cracks_positions_dimless();
-        auto sum = 0.0;
+        decltype(alpha) sum = 0.0;
         for (int i = 0; i < n; i++) {
-            sum += lambdai[i] * zetai[i](alpha) * dS(alpha, xi, xii[i]);
+            auto zeta = static_cast<decltype(alpha)>(zetai[i](alpha));
+            sum += lambdai[i] * zeta * dS(alpha, xi, xii[i]);
         }
         return (0.5 / alpha) * sum + (alpha)*cosh(alpha * xi);
     }
 
-    double ddA(double alpha, double xi) {
+    auto ddA(auto alpha, double xi) const -> decltype(alpha) {
         auto lambdai = this->lambdai();
         auto n = this->cracks.size();
         auto mui = this->mui();
         auto xii = this->cracks_positions_dimless();
-        auto sum = 0.0;
+        decltype(alpha) sum = 0.0;
         for (int i = 0; i < n; i++) {
-            sum += lambdai[i] * mui[i](alpha) * ddS(alpha, xi, xii[i]);
+            auto mu = static_cast<decltype(alpha)>(mui[i](alpha));
+            sum += lambdai[i] * mu * ddS(alpha, xi, xii[i]);
         }
         return (0.5 / alpha) * sum - (alpha * alpha) * sin(alpha * xi);
     }
 
-    double ddB(double alpha, double xi) {
+    auto ddB(auto alpha, double xi) const -> decltype(alpha) {
         auto lambdai = this->lambdai();
         auto n = this->cracks.size();
         auto upsiloni = this->upsiloni();
         auto xii = this->cracks_positions_dimless();
-        auto sum = 0.0;
+        decltype(alpha) sum = 0.0;
         for (int i = 0; i < n; i++) {
-            sum += lambdai[i] * upsiloni[i](alpha) * ddS(alpha, xi, xii[i]);
+            auto upsilon = static_cast<decltype(alpha)>(upsiloni[i](alpha));
+            sum += lambdai[i] * upsilon * ddS(alpha, xi, xii[i]);
         }
         return (0.5 / alpha) * sum - (alpha * alpha) * cos(alpha);
     }
 
-    double ddC(double alpha, double xi) {
+    auto ddC(auto alpha, double xi) const -> decltype(alpha) {
         auto lambdai = this->lambdai();
         auto n = this->cracks.size();
         auto zetai = this->zetai();
         auto xii = this->cracks_positions_dimless();
-        auto sum = 0.0;
+        decltype(alpha) sum = 0.0;
         for (int i = 0; i < n; i++) {
-            sum += lambdai[i] * zetai[i](alpha) * ddS(alpha, xi, xii[i]);
+            auto zeta = static_cast<decltype(alpha)>(zetai[i](alpha));
+            sum += lambdai[i] * zeta * ddS(alpha, xi, xii[i]);
         }
         return (0.5 / alpha) * sum + (alpha * alpha) * sinh(alpha);
     }
 
-    double ddD(double alpha, double xi) {
+    auto ddD(auto alpha, double xi) const -> decltype(alpha) {
         auto lambdai = this->lambdai();
         auto n = this->cracks.size();
         auto etai = this->etai();
         auto xii = this->cracks_positions_dimless();
-        auto sum = 0.0;
+        decltype(alpha) sum = 0.0;
         for (int i = 0; i < n; i++) {
-            sum += lambdai[i] * etai[i](alpha) * ddS(alpha, xi, xii[i]);
+            auto eta = static_cast<decltype(alpha)>(etai[i](alpha));
+            sum += lambdai[i] * eta * ddS(alpha, xi, xii[i]);
         }
         return (0.5 / alpha) * sum + (alpha * alpha) * cosh(alpha);
     }
 };
 
-double chnc(double alpha) {
+nld::dual chnc(nld::dual alpha) {
     return cos(alpha) * sinh(alpha) - sin(alpha) * cosh(alpha);
 }
 
 auto make_hcc_bf(CrackedBeam cracked_beam) {
-    auto chc = [=](auto alpha) mutable {
+    auto chc = [=](auto alpha) {
         auto a11 = cracked_beam.A(alpha, 1);
         auto a12 = cracked_beam.C(alpha, 1);
         auto a21 = cracked_beam.dA(alpha, 1);
@@ -298,7 +325,7 @@ auto make_hcc_bf(CrackedBeam cracked_beam) {
 }
 
 auto make_chc_bf(CrackedBeam cracked_beam) {
-    auto chc = [=](auto alpha) mutable -> auto {
+    auto chc = [=](auto alpha) {
         auto a11 = cracked_beam.A(alpha, 1) - cracked_beam.C(alpha, 1);
         auto a12 = cracked_beam.B(alpha, 1) - cracked_beam.D(alpha, 1);
         auto a21 = cracked_beam.ddA(alpha, 1) - cracked_beam.ddC(alpha, 1);
@@ -309,7 +336,8 @@ auto make_chc_bf(CrackedBeam cracked_beam) {
 }
 
 // TODO: make it not so dummy, lazy ass
-auto find_roots(auto fn, Interval interval, size_t discretization) {
+auto find_roots(auto fn, Interval interval, size_t discretization)
+    -> Eigen::VectorXd {
     auto a = interval.begin;
     auto b = interval.end;
     auto len = b - a;
@@ -325,7 +353,28 @@ auto find_roots(auto fn, Interval interval, size_t discretization) {
         if (fn_prev * fn_curr < 0)
             roots.push_back(x_curr);
     }
-    return roots;
+
+    Eigen::Map<Eigen::VectorXd> roots_(roots.data(), roots.size());
+    return roots_;
+}
+
+auto find_roots_newton(auto fn, Interval interval) {
+    auto initial = find_roots(fn, interval, 100);
+
+    for (std::size_t i = 0; i < initial.size(); i++) {
+        nld::vector_xdd first_guess(1);
+        first_guess(0) = initial[i];
+        nld::newton_parameters np{10, 1.0e-6};
+        auto wrp = [fn](const nld::vector_xdd &x) -> nld::vector_xdd {
+            nld::vector_xdd y(1);
+            y(0) = fn(x(0));
+            return y;
+        };
+        if (nld::newton(wrp, nld::wrt(first_guess), nld::at(first_guess), np))
+            initial[i] = static_cast<double>(first_guess(0));
+    }
+
+    return initial;
 }
 
 auto normalized_mode(auto fn) {
@@ -345,7 +394,7 @@ auto normalized_mode(auto fn) {
     auto abs_max = std::max(max, std::abs(min));
     abs_max = 1.0;
 
-    return [fn, abs_max](auto xi) mutable { return fn(xi) / abs_max; };
+    return [fn, abs_max](auto xi) { return fn(xi) / abs_max; };
 }
 
 auto make_eigen_mode_ch(CrackedBeam cracked_beam, int index) {
@@ -354,8 +403,7 @@ auto make_eigen_mode_ch(CrackedBeam cracked_beam, int index) {
         find_roots(eigen_frequences_equation, Interval{3.7, 11.0}, 10000);
     auto alpha = alphai[index];
 
-    std::cout << "C-H: " << alphai[0] << std::endl;
-    auto em = [=](auto xi) mutable {
+    auto em = [=](auto xi) {
         auto aux = cracked_beam.A(alpha, xi);
         auto coef = (cracked_beam.A(alpha, 1) - cracked_beam.C(alpha, 1)) /
                     (cracked_beam.B(alpha, 1) - cracked_beam.D(alpha, 1));
@@ -376,8 +424,7 @@ auto make_eigen_mode_hc(CrackedBeam cracked_beam, int index) {
         find_roots(eigen_frequences_equation, Interval{3.7, 11.0}, 10000);
     auto alpha = alphai[index];
 
-    std::cout << "H-C: " << alphai[1] << std::endl;
-    auto em = [=](double xi) mutable {
+    auto em = [=](double xi) {
         auto aux = cracked_beam.A(alpha, xi);
         auto coef = -cracked_beam.A(alpha, 1) / cracked_beam.C(alpha, 1);
         aux += coef * cracked_beam.C(alpha, xi);
@@ -388,8 +435,10 @@ auto make_eigen_mode_hc(CrackedBeam cracked_beam, int index) {
 
 enum BC { CH };
 
-template <enum BC>
+template <typename BC>
 struct BeamTraits;
+
+struct CHTag {};
 
 template <typename T>
 decltype(auto) _S(double k, T xi) {
@@ -412,38 +461,62 @@ decltype(auto) _V(double k, T xi) {
 }
 
 template <>
-struct BeamTraits<BC::CH> {
-    BeamTraits(Beam beam) { calculate_roots(); }
+struct BeamTraits<CHTag> {
+    BeamTraits(Beam beam) : beam{beam} { calculate_roots(); }
 
-    auto Phi(std::size_t m) {
+    auto Phi(std::size_t m) const {
         auto k = roots[m];
+        auto w = 2.0;
 
-        return [&, k](auto xi) {
-            return _U(k, xi) - (_S(k, 1.0) / _T(k, 1.0)) * _V(k, xi);
+        return [&, k, w](auto xi) {
+            return w * (_U(k, xi) - (_S(k, 1.0) / _T(k, 1.0)) * _V(k, xi));
         };
     }
 
-    auto dPhi(std::size_t m) {
+    auto dPhi(std::size_t m) const {
         auto k = roots[m];
+        auto w = 2.0;
 
-        return [&, k](auto xi) {
-            return k * (_T(k, xi) - (_S(k, 1.0) / _T(k, 1.0)) * _U(k, xi));
+        return [&, k, w](auto xi) {
+            return k * w * (_T(k, xi) - (_S(k, 1.0) / _T(k, 1.0)) * _U(k, xi));
         };
+    }
+
+    auto ddPhi(std::size_t m) const {
+        auto k = roots[m];
+        auto w = 2.0;
+
+        return [&, k, w](auto xi) {
+            return k * k * w *
+                   (_S(k, xi) - (_S(k, 1.0) / _T(k, 1.0)) * _T(k, xi));
+        };
+    }
+
+    auto frequencies() const -> nld::vector_xd {
+        auto E = beam.material.young_module;
+        auto rho = beam.material.density;
+        auto A = beam.geometry.area();
+        auto I = beam.geometry.inertia();
+
+        auto L = beam.geometry.length;
+        auto squared = roots.array().square();
+        return squared / L / L * sqrt(E * I / rho / A);
     }
 
 private:
     void calculate_roots() {
-        roots = find_roots(chnc, Interval{3.7, 11.0}, 1000);
+        roots = find_roots_newton(chnc, Interval{3.7, 11.0});
     }
 
-    std::vector<double> roots;
+    Beam beam;
+    nld::vector_xd roots;
 };
 
-template <enum BC>
+template <typename BC>
 struct CrackedBeamTraits;
 
 template <>
-struct CrackedBeamTraits<BC::CH> {
+struct CrackedBeamTraits<CHTag> {
     CrackedBeamTraits(CrackedBeam cb) : cracked_beam(cb) {
         calculate_roots();
         calculate_lambdai();
@@ -454,80 +527,88 @@ struct CrackedBeamTraits<BC::CH> {
         calculate_normalization_factors();
     }
 
-    auto S_overline(std::size_t m, std::size_t i) {
+    auto S_overline(std::size_t m, std::size_t i) const {
         auto w = normalization_factors(m);
         return [&, w, m, i](double xi) { return w * S_overline_raw(m, i, xi); };
     }
 
-    auto dS_overline(std::size_t m, std::size_t i) {
+    auto dS_overline(std::size_t m, std::size_t i) const {
         auto w = normalization_factors(m);
         return
             [&, w, m, i](double xi) { return w * dS_overline_raw(m, i, xi); };
     }
 
-    auto betta(std::size_t m, std::size_t i) {
+    auto betta(std::size_t m) const {
         auto w = normalization_factors(m);
         return [&, w, m](double xi) { return w * betta_raw(m, xi); };
     }
 
-    auto dbetta(std::size_t m, std::size_t i) {
+    auto dbetta(std::size_t m) const {
         auto w = normalization_factors(m);
         return [&, w, m](double xi) { return w * dbetta_raw(m, xi); };
     }
 
     /// @brief eigen mode function factory
     /// @param m mode number starting from zero
-    auto Phi(std::size_t m) {
+    auto Phi(std::size_t m) const {
         auto factor = normalization_factors(m);
         return [&, factor, m](auto xi) { return factor * mode(m, xi); };
     }
 
+    auto frequencies() const -> nld::vector_xd {
+        auto E = cracked_beam.beam.material.young_module;
+        auto rho = cracked_beam.beam.material.density;
+        auto A = cracked_beam.beam.geometry.area();
+        auto I = cracked_beam.beam.geometry.inertia();
+
+        auto L = cracked_beam.beam.geometry.length;
+        auto squared = roots.array().square();
+        return squared / L / L * sqrt(E * I / rho / A);
+    }
+
 private:
-    double S_overline_raw(std::size_t m, std::size_t i, double xi) {
+    double S_overline_raw(std::size_t m, std::size_t i, double xi) const {
         auto alpha = roots[m];
         return S_factor(m, i) * S(alpha, xi, xii(i));
     }
 
-    double dS_overline_raw(std::size_t m, std::size_t i, double xi) {
+    double dS_overline_raw(std::size_t m, std::size_t i, double xi) const {
         auto alpha = roots[m];
         return S_factor(m, i) * dS(alpha, xi, xii(i));
     }
 
-    double betta_raw(std::size_t m, double xi) {
+    double betta_raw(std::size_t m, double xi) const {
         auto alpha = roots[m];
         auto Psi = Psii[m];
         return sin(alpha * xi) - Psi * cos(alpha * xi) - sinh(alpha * xi) +
                Psi * cosh(alpha * xi);
     }
 
-    double dbetta_raw(std::size_t m, double xi) {
+    double dbetta_raw(std::size_t m, double xi) const {
         auto alpha = roots[m];
         auto Psi = Psii[m];
         return alpha * (cos(alpha * xi) + Psi * sin(alpha * xi) -
                         cosh(alpha * xi) + Psi * sinh(alpha * xi));
     }
 
-    auto mode(std::size_t m, auto xi) {
+    auto mode(std::size_t m, auto xi) const {
         auto alpha = roots[m];
         auto Psi = Psii[m];
         auto n = cracked_beam.cracks.size();
 
         auto sum = 0.0;
         for (std::size_t i = 0; i < n; i++) {
-            auto aux = mui(m, i) - Psi * upsiloni(m, i) - zetai(m, i) +
-                       Psi * etai(m, i);
-            aux *= lambdai[i];
             sum += S_overline_raw(m, i, xi) * heaviside(xi, xii(i));
         }
 
-        sum = (0.5 / alpha) * sum + betta_raw(m, xi);
+        sum = sum + betta_raw(m, xi);
 
         return sum;
     }
 
     void calculate_roots() {
         auto eq = make_chc_bf(cracked_beam);
-        roots = find_roots(eq, Interval{3.7, 11.0}, 1000);
+        roots = find_roots_newton(eq, Interval{3.7, 11.0});
     }
 
     void calculate_lambdai() {
@@ -553,7 +634,8 @@ private:
 
         for (size_t row = 0; row < values.rows(); row++) {
             for (size_t col = 0; col < values.cols(); col++) {
-                values(row, col) = functions[col](roots[row]);
+                values(row, col) =
+                    static_cast<double>(functions[col](roots[row]));
             }
         }
 
@@ -585,7 +667,8 @@ private:
                 auto aux = mui(row, col) - Psii(row) * upsiloni(row, col) -
                            zetai(row, col) + Psii(row) * etai(row, col);
                 aux *= lambdai(col);
-                s_factor(row, col) = aux;
+                auto alpha = roots[row];
+                s_factor(row, col) = 0.5 / alpha * aux;
             }
         }
         S_factor = s_factor;
@@ -598,14 +681,15 @@ private:
             auto distance = nld::integrate<nld::gauss_kronrod21>(
                 [&mode_raw](auto xi) { return mode_raw(xi) * mode_raw(xi); },
                 nld::segment{0.0, 1.0});
-            factors(i) = 1.0 / distance;
+            factors(i) = 1.0 / sqrt(distance);
         }
         normalization_factors = factors;
     }
 
+private:
     CrackedBeam cracked_beam;
 
-    std::vector<double> roots;
+    nld::vector_xd roots;
 
     nld::vector_xd lambdai;
     nld::vector_xd xii;
@@ -622,13 +706,373 @@ private:
     nld::vector_xd normalization_factors;
 };
 
+struct Force {
+    double position;
+    double amplitude;
+};
+
+template <typename BC>
+struct CrackedCaddemiBeamDynamicSystem final {
+    CrackedCaddemiBeamDynamicSystem(CrackedBeam cracked_beam, Force force,
+                                    double friction,
+                                    std::size_t degrees_of_freedom)
+        : cracked_beam{cracked_beam}, force{force}, friction{friction},
+          degrees_of_freedom{degrees_of_freedom},
+          beam_traits{cracked_beam.beam}, cracked_beam_traits{cracked_beam} {
+        calculate();
+    }
+
+    void test() {
+        std::cout << "Mass crack\n"
+                  << beam_traits.frequencies()(0) << std::endl;
+    }
+
+    auto operator()(const nld::vector_xdd &y, nld::dual t,
+                    nld::dual omega) const {
+        if (switch_function(y))
+            return opened_crack(y, t, omega);
+        else
+            return closed_crack(y, t, omega);
+    }
+
+    using switch_fn = std::function<bool(const nld::vector_xdd &)>;
+
+private:
+    auto closed_crack(const nld::vector_xdd &y, nld::dual t,
+                      nld::dual omega) const {
+        nld::vector_xdd dy(2 * degrees_of_freedom);
+        nld::vector_xdd yc = y.head(degrees_of_freedom);
+        auto yct = nld::utils::tensor_view(yc);
+
+        auto f =
+            stiffnes_no_crack.cwiseProduct(stiffnes_no_crack).cwiseProduct(yc);
+
+        Eigen::Tensor<nld::dual, 4> G =
+            R_bar_no_crack.template cast<nld::dual>();
+        Eigen::Tensor<nld::dual, 1> fnlt =
+            G.contract(yct, std::array{Eigen::IndexPair(3, 0)})
+                .contract(yct, std::array{Eigen::IndexPair(2, 0)})
+                .contract(yct, std::array{Eigen::IndexPair(1, 0)});
+        Eigen::Map<nld::vector_xdd> fnl(fnlt.data(), degrees_of_freedom);
+
+        dy.head(degrees_of_freedom) = y.tail(degrees_of_freedom);
+        dy.tail(degrees_of_freedom) =
+            -friction * y.tail(degrees_of_freedom) - f - fnl -
+            force_no_crack * nld::dual(sin(t * 2.0 * PI));
+
+        dy *= 2.0 * PI;
+        dy /= omega;
+
+        return dy;
+    }
+
+    auto opened_crack(const nld::vector_xdd &y, nld::dual t,
+                      nld::dual omega) const {
+        nld::vector_xdd dy(2 * degrees_of_freedom);
+        nld::vector_xdd yc = y.head(degrees_of_freedom);
+        auto yct = nld::utils::tensor_view(yc);
+
+        auto f = stiffnes_crack.cwiseProduct(stiffnes_crack).cwiseProduct(yc);
+
+        Eigen::Tensor<nld::dual, 4> G = R_bar_crack.template cast<nld::dual>();
+        Eigen::Tensor<nld::dual, 1> fnlt =
+            G.contract(yct, std::array{Eigen::IndexPair(3, 0)})
+                .contract(yct, std::array{Eigen::IndexPair(2, 0)})
+                .contract(yct, std::array{Eigen::IndexPair(1, 0)});
+        Eigen::Map<nld::vector_xdd> fnl(fnlt.data(), degrees_of_freedom);
+
+        dy.head(degrees_of_freedom) = y.tail(degrees_of_freedom);
+        dy.tail(degrees_of_freedom) =
+            -friction * y.tail(degrees_of_freedom) - f - fnl -
+            force_crack * nld::dual(sin(t * 2.0 * PI));
+
+        dy *= 2.0 * PI;
+        dy /= omega;
+
+        return dy;
+    }
+
+    void calculate() {
+        switch_function = make_switch_function();
+        mass_no_crack = calculate_mass(beam_traits);
+        mass_crack = calculate_mass(cracked_beam_traits);
+        stiffnes_no_crack = calculate_stiffness_no_crack();
+        stiffnes_crack = calculate_stiffness_crack();
+        first_frequence_no_crack = calculate_fitst_frequence_no_crack();
+        force_no_crack = calculate_force_no_crack();
+        force_crack = calculate_force_crack();
+        R_bar_no_crack = calculate_R_bar_no_crack();
+        R_bar_crack = calculate_R_bar_crack();
+    }
+
+    auto make_switch_function() const -> switch_fn {
+        auto xic0 = cracked_beam.cracks_positions_dimless()[0];
+        Eigen::VectorXi space = Eigen::VectorXi::LinSpaced(
+            degrees_of_freedom, 0, degrees_of_freedom - 1);
+        nld::vector_xd curvature_at_crack = space.unaryExpr(
+            [&](auto i) { return cracked_beam_traits.Phi(i)(xic0); });
+
+        return [&, curvature_at_crack](const nld::vector_xdd &y) -> bool {
+            nld::vector_xdd yc =
+                y.head(degrees_of_freedom).template cast<double>();
+            return curvature_at_crack.cwiseProduct(yc).sum() > 0.0;
+        };
+    }
+
+    nld::matrix_xd calculate_mass(auto traits) const {
+        std::size_t N = degrees_of_freedom;
+        nld::matrix_xd mass(N, N);
+
+        for (std::size_t i = 0; i < N; i++) {
+            for (std::size_t j = 0; j < N; j++) {
+                auto fn = [&traits, i, j](auto xi) -> double {
+                    return traits.Phi(i)(xi) * traits.Phi(j)(xi);
+                };
+                mass(i, j) = nld::integrate<nld::gauss_kronrod21>(
+                    fn, nld::segment{0.0, 1.0});
+            }
+        }
+
+        auto rho = cracked_beam.beam.material.density;
+        auto A = cracked_beam.beam.geometry.area();
+
+        return rho * A * mass;
+    }
+
+    auto calculate_stiffness_no_crack() const -> nld::vector_xd {
+        auto frequencies = beam_traits.frequencies();
+        double Omega0 = beam_traits.frequencies()(0);
+        frequencies /= Omega0;
+        return frequencies;
+    }
+
+    auto calculate_stiffness_crack() const -> nld::vector_xd {
+        auto frequencies = cracked_beam_traits.frequencies();
+        double Omega0 = beam_traits.frequencies()(0);
+        frequencies /= Omega0;
+        return frequencies;
+    }
+
+    double calculate_fitst_frequence_no_crack() {
+        return beam_traits.frequencies()(0);
+    }
+
+    auto calculate_force_no_crack() -> nld::vector_xd {
+        auto N = degrees_of_freedom;
+        nld::vector_xd F_(N);
+
+        auto h = cracked_beam.beam.geometry.height / 2.0;
+        auto xif = force.position / cracked_beam.beam.geometry.length;
+        auto F = force.amplitude;
+        auto Omega0 = beam_traits.frequencies()(0);
+
+        for (size_t i = 0; i < N; i++) {
+            F_(i) = F * beam_traits.Phi(i)(xif) / Omega0 / Omega0 / h /
+                    sqrt(cracked_beam.beam.geometry.length);
+        }
+
+        auto Fnc = mass_no_crack.inverse() * F_;
+
+        return Fnc;
+    }
+
+    auto calculate_force_crack() -> nld::vector_xd {
+        auto N = degrees_of_freedom;
+        nld::vector_xd F_(N);
+
+        auto h = cracked_beam.beam.geometry.height / 2.0;
+        auto xif = force.position / cracked_beam.beam.geometry.length;
+        auto F = force.amplitude;
+        auto Omega0 = beam_traits.frequencies()(0);
+
+        for (size_t i = 0; i < N; i++) {
+            F_(i) = F * cracked_beam_traits.Phi(i)(xif) / Omega0 / Omega0 / h /
+                    sqrt(cracked_beam.beam.geometry.length);
+        }
+
+        auto Fc = mass_crack.inverse() * F_;
+
+        return Fc;
+    }
+
+    Eigen::Tensor<double, 4> calculate_R_bar_no_crack() {
+        auto N = degrees_of_freedom;
+        Eigen::Tensor<double, 4> R(N, N, N, N);
+        auto E = cracked_beam.beam.material.young_module;
+        auto A = cracked_beam.beam.geometry.area();
+        auto L = cracked_beam.beam.geometry.length;
+        auto h = cracked_beam.beam.geometry.height / 2.0;
+        auto Omega0 = beam_traits.frequencies()(0);
+
+        // TODO Symetry
+        for (size_t i = 0; i < N; i++) {
+            for (size_t j = 0; j < N; j++) {
+                for (size_t k = 0; k < N; k++) {
+                    for (size_t l = 0; l < N; l++) {
+                        auto make_integrand = [&](auto ii, auto jj) {
+                            return [&, ii, jj](auto xi) {
+                                return beam_traits.dPhi(ii)(xi) *
+                                       beam_traits.dPhi(jj)(xi);
+                            };
+                        };
+
+                        auto R_ij = nld::integrate<nld::gauss_kronrod21>(
+                            make_integrand(i, j), nld::segment{0.0, 1.0});
+                        auto R_kl = nld::integrate<nld::gauss_kronrod21>(
+                            make_integrand(k, l), nld::segment{0.0, 1.0});
+
+                        auto R_bar_ijkl = (h * h / Omega0 / Omega0) * (E * A) /
+                                          2.0 / pow(L, 5) * R_ij * R_kl;
+                        R(i, j, k, l) = R_bar_ijkl;
+                    }
+                }
+            }
+        }
+
+        std::array dimensions = {Eigen::IndexPair(0, 1)};
+        nld::matrix_xd mass_no_crack_inversed = mass_no_crack.inverse();
+        Eigen::Tensor<double, 4> R_ = R.contract(
+            nld::utils::tensor_view(mass_no_crack_inversed), dimensions);
+
+        return R_;
+    }
+
+    Eigen::Tensor<double, 4> calculate_R_bar_crack() {
+        auto N = degrees_of_freedom;
+        Eigen::Tensor<double, 4> R(N, N, N, N);
+        auto E = cracked_beam.beam.material.young_module;
+        auto A = cracked_beam.beam.geometry.area();
+        auto L = cracked_beam.beam.geometry.length;
+        auto h = cracked_beam.beam.geometry.height / 2.0;
+        auto Omega0 = beam_traits.frequencies()(0);
+        auto cracks_positions_dimless = cracked_beam.cracks_positions_dimless();
+
+        auto calculate_R_nm = [&](auto n, auto m) -> double {
+            auto N_cracks = cracked_beam.cracks.size();
+
+            auto R_nm = 0.0;
+            for (size_t i = 0; i < N_cracks; i++) {
+                auto xii = cracks_positions_dimless[i];
+                for (size_t j = 0; j < N_cracks; j++) {
+                    auto S_ijnm = [&, i, j, n, m](auto xi) {
+                        return cracked_beam_traits.dS_overline(n, i)(xi) *
+                               cracked_beam_traits.dS_overline(m, j)(xi);
+                    };
+
+                    auto xij = cracks_positions_dimless[j];
+                    auto R_ij =
+                        1.0 *
+                        nld::integrate<nld::gauss_kronrod21>(
+                            S_ijnm, nld::segment{std::max(xii, xij), 1.0});
+
+                    auto a = [](auto ii, auto jj) -> double {
+                        if (jj < ii)
+                            return 0.0;
+                        if (jj == ii)
+                            return 0.5;
+                        return 1.0;
+                    };
+
+                    R_ij += 1.0 * a(i, j) *
+                            cracked_beam_traits.dS_overline(n, i)(xij) *
+                            cracked_beam_traits.S_overline(m, j)(xij);
+
+                    auto b = [](auto ii, auto jj) -> double {
+                        if (ii < jj)
+                            return 0.0;
+                        if (jj == ii)
+                            return 0.5;
+                        return 1.0;
+                    };
+
+                    R_ij += 1.0 * b(i, j) *
+                            cracked_beam_traits.S_overline(n, i)(xii) *
+                            cracked_beam_traits.dS_overline(m, j)(xii);
+                    R_nm += R_ij;
+                }
+                auto Adel = 2.013;
+                R_nm += 1.0 * cracked_beam_traits.S_overline(n, i)(xii) *
+                        cracked_beam_traits.S_overline(m, i)(xii);
+
+                auto R1_aux = [&, i, n, m](auto xi) -> double {
+                    return cracked_beam_traits.dS_overline(n, i)(xi) *
+                           cracked_beam_traits.dbetta(m)(xi);
+                };
+                auto R2_aux = [&, i, n, m](auto xi) -> double {
+                    return cracked_beam_traits.dS_overline(m, i)(xi) *
+                           cracked_beam_traits.dbetta(n)(xi);
+                };
+
+                R_nm += 1.0 * nld::integrate<nld::gauss_kronrod21>(
+                                  R1_aux, nld::segment{xii, 1.0});
+                R_nm += 1.0 * nld::integrate<nld::gauss_kronrod21>(
+                                  R2_aux, nld::segment{xii, 1.0});
+                R_nm += 1.0 * nld::integrate<nld::gauss_kronrod21>(
+                                  [&](auto xi) {
+                                      return cracked_beam_traits.dbetta(n)(xi) *
+                                             cracked_beam_traits.dbetta(m)(xi);
+                                  },
+                                  nld::segment{0, 1.0});
+            }
+            return R_nm;
+        };
+
+        // TODO Symetry
+        for (size_t i = 0; i < N; i++) {
+            for (size_t j = 0; j < N; j++) {
+                for (size_t k = 0; k < N; k++) {
+                    for (size_t l = 0; l < N; l++) {
+                        auto make_integrand = [&](auto ii, auto jj) {
+                            return [&, ii, jj](auto xi) {
+                                return beam_traits.dPhi(ii)(xi) *
+                                       beam_traits.dPhi(jj)(xi);
+                            };
+                        };
+
+                        auto R_ij = calculate_R_nm(i, j);
+                        auto R_kl = calculate_R_nm(k, l);
+
+                        auto R_bar_ijkl = (h * h / Omega0 / Omega0) * (E * A) /
+                                          2.0 / pow(L, 5) * R_ij * R_kl;
+                        R(i, j, k, l) = R_bar_ijkl;
+                    }
+                }
+            }
+        }
+
+        std::array dimensions = {Eigen::IndexPair(0, 1)};
+        nld::matrix_xd mass_crack_inversed = mass_crack.inverse();
+        Eigen::Tensor<double, 4> R_ = R.contract(
+            nld::utils::tensor_view(mass_crack_inversed), dimensions);
+
+        return R_;
+    }
+
+    CrackedBeam cracked_beam;
+    Force force;
+    double friction;
+    std::size_t degrees_of_freedom;
+    BeamTraits<BC> beam_traits;
+    CrackedBeamTraits<BC> cracked_beam_traits;
+
+    switch_fn switch_function;
+    nld::matrix_xd mass_no_crack;
+    nld::matrix_xd mass_crack;
+    nld::vector_xd stiffnes_no_crack;
+    nld::vector_xd stiffnes_crack;
+    nld::vector_xd force_no_crack;
+    nld::vector_xd force_crack;
+    double first_frequence_no_crack;
+    Eigen::Tensor<double, 4> R_bar_no_crack;
+    Eigen::Tensor<double, 4> R_bar_crack;
+};
+
 void integrate_eigen_mode(CrackedBeam cracked_beam) {
     auto fem = make_eigen_mode_hc(cracked_beam, 0);
     auto sem = make_eigen_mode_hc(cracked_beam, 1);
     auto mass = [=](auto xi) mutable { return sem(xi) * fem(xi); };
     auto value =
         nld::integrate<nld::gauss_kronrod21>(mass, nld::segment{0.0, 1.0});
-    std::cout << "value: " << value << std::endl;
 }
 
 auto make_eigen_mode_no_krack(size_t index) {
@@ -657,7 +1101,6 @@ void integrate_eigen_mode2(CrackedBeam cracked_beam) {
     auto mass = [=](auto xi) mutable { return sem(xi) * fem(xi); };
     auto value =
         nld::integrate<nld::gauss_kronrod21>(mass, nld::segment{0.0, 1.0});
-    std::cout << "value: " << value << std::endl;
 }
 
 int main(int argc, char *argv[]) {
@@ -666,46 +1109,102 @@ int main(int argc, char *argv[]) {
     auto crack = Crack{geometry.length * 0.5, geometry.height * 0.4};
     auto beam = Beam{material, geometry};
     auto cracked_beam = CrackedBeam{beam, std::vector<Crack>{crack}};
-    std::cout << "lambdai[0]: " << cracked_beam.lambdai()[0] << std::endl;
 
-    auto fem = make_eigen_mode_ch(cracked_beam, 1);
-    auto sem = make_eigen_mode_hc(cracked_beam, 1);
+    auto fem = make_eigen_mode_ch(cracked_beam, 0);
+    auto sem = make_eigen_mode_hc(cracked_beam, 0);
     auto mass = [=](auto xi) mutable { return sem(xi) * fem(xi); };
-    CrackedBeamTraits<BC::CH> chcbeam(cracked_beam);
-    auto semnc = chcbeam.Phi(1);
-    std::cout << "S";
+    CrackedBeamTraits<CHTag> chcbeam(cracked_beam);
+    auto semnc = chcbeam.Phi(2);
 
-    BeamTraits<BC::CH> traits(beam);
+    BeamTraits<CHTag> traits(beam);
+    CrackedCaddemiBeamDynamicSystem<CHTag> ds{
+        cracked_beam, Force{beam.geometry.length / 2.0, 4'000.0}, 0.1, 3};
 
-    integrate_eigen_mode(cracked_beam);
+    nld::vector_xdd y0(6);
+    y0 << 0.1, 0.1, 0.2, 0.2, 0.3, 0.4;
+    std::cout << ds(y0, 0, 0.2);
 
-    auto N = 200;
+    nld::continuation_parameters params(nld::newton_parameters(100, 0.0005),
+                                        2.9, 0.001, 0.01,
+                                        nld::direction::forward);
 
-    std::vector<double> xii;
-    xii.reserve(N + 1);
+    auto ip = nld::periodic_parameters{1, 300};
+    auto bvp = nld::periodic<nld::runge_kutta_4>(nld::non_autonomous(ds), ip);
 
-    std::vector<double> yi;
-    yi.reserve(N + 1);
+    nld::vector_xdd u0(7);
+    u0 << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2;
 
-    for (size_t i = 0; i < N + 1; i++) {
-        auto xi = (double)i / (double)N;
-        auto y = fem(xi);
-        xii.push_back(xi);
-        yi.push_back(y);
+    nld::vector_xdd v0(7);
+    v0 << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0;
+
+    std::cout << "Start\n";
+
+    std::vector<double> Omega, A1;
+    std::ofstream curve(
+        "/Volumes/Data/phd2023/compare_models_30_10_2023/curve_caddemi.txt",
+        std::ofstream::trunc);
+    std::ofstream pd(
+        "/Volumes/Data/phd2023/compare_models_30_10_2023/pd_caddemi.txt",
+        std::ofstream::trunc);
+    nld::vector_xdd sln_main_resonance(7);
+    for (auto [solution, M, A] :
+         nld::arc_length(bvp, params, u0,
+                         nld::concat(nld::solution(), nld::monodromy(),
+                                     nld::mean_amplitude(0)))) {
+        Omega.push_back((double)solution(solution.size() - 1));
+        A1.push_back((double)A);
+        Eigen::EigenSolver<Eigen::MatrixXd> es(M);
+        auto ev = es.eigenvalues();
+        nld::vector_xd r = ev.real().array().pow(2) + ev.imag().array().pow(2);
+        auto pred = (r.array() < 1.0);
+        auto biff = (0.98 < r.array() && r.array() < 1.02);
+        if (biff.any()) {
+            for (nld::index i = 0; i < ev.size(); i++) {
+                auto re = ev(i).real();
+                auto im = ev(i).imag();
+                auto pdbiff = ((-1.02 < re) && (re < -0.98)) &&
+                              ((-0.02 < im) && (im < 0.02));
+                if (pdbiff) {
+                    pd << (double)solution(solution.size() - 1) << ' '
+                       << (double)A << std::endl;
+                }
+            }
+        }
+        auto frq = (double)solution(solution.size() - 1);
+        if (abs(frq - 1.2) < 0.01) {
+            sln_main_resonance = solution;
+            std::cout << "FRQ: " << frq << std::endl;
+        }
+        curve << (double)solution(solution.size() - 1) << ' ' << (double)A
+              << ' ' << (int)pred.all() << std::endl;
+
+        std::cout << "Omega: " << solution(solution.size() - 1) << std::endl;
     }
 
-    std::vector<double> yinc;
-    yinc.reserve(N + 1);
-    for (size_t i = 0; i < N + 1; i++) {
-        auto xi = (double)i / (double)N;
-        auto y = semnc(xi);
-        yinc.push_back(y);
-    }
+    nld::dual omega_main = sln_main_resonance(sln_main_resonance.size() - 1);
+    nld::dual period_main = 2.0 * PI / omega_main;
+    nld::vector_xdd ic = sln_main_resonance.head(sln_main_resonance.size() - 1);
+    auto motions_near_main_resonance = nld::runge_kutta_4::solution(
+        ds, nld::constant_step_parameters{0.0, 10.0, 4000}, ic,
+        nld::arguments(omega_main));
 
-    plt::named_plot("Mode", xii, yi);
-    plt::named_plot("Mode_NC", xii, yinc, "r--");
-    plt::ylabel(R"($A_1$)");
-    plt::xlabel(R"($\Omega$)");
+    nld::vector_xd q1_ = motions_near_main_resonance.col(0);
+    nld::vector_xd q2_ = motions_near_main_resonance.col(2);
+    nld::vector_xd time_ = Eigen::VectorXd::LinSpaced(
+        motions_near_main_resonance.rows(), 0.0, (double)period_main);
+    std::vector<double> q1(q1_.data(), q1_.data() + q1_.size());
+    std::vector<double> q2(q2_.data(), q2_.data() + q2_.size());
+    std::vector<double> time(time_.data(), time_.data() + time_.size());
+
+    std::ofstream sln("/Volumes/Data/phd2023/compare_models_30_10_2023/sln.txt",
+                      std::ofstream::trunc);
+
+    sln << motions_near_main_resonance;
+
+    // plt::named_plot("q1/q2", q1, q2);
+    plt::named_plot("q1", time, q1);
+    plt::named_plot("q2", time, q2);
+    // plt::named_plot("AFC", Omega, A1);
     plt::legend();
     plt::show();
 
