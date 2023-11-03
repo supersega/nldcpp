@@ -14,6 +14,9 @@ find_package(GSL REQUIRED)
 
 add_subdirectory(autodiff)
 add_subdirectory(nld)
-add_subdirectory(examples)
-enable_testing()
-add_subdirectory(test)
+
+if (${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
+    add_subdirectory(examples)
+    enable_testing()
+    add_subdirectory(test)
+endif ()
