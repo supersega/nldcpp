@@ -1,12 +1,4 @@
-#include "nld/core/aliases.hpp"
-#include "nld/core/arguments.hpp"
-#include "nld/math/runge_kutta4.hpp"
-#include "nld/math/runge_kutta_parameters.hpp"
 constexpr auto PI = 3.14159265358979323846264338327950288;
-#include "nld/math/gauss_kronrod21.hpp"
-#include "nld/math/integrate.hpp"
-#include "nld/math/newton.hpp"
-#include "nld/math/segment.hpp"
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -19,6 +11,7 @@ constexpr auto PI = 3.14159265358979323846264338327950288;
 #include <vector>
 
 #include <nld/autocont.hpp>
+#include <nld/core.hpp>
 #include <nld/math.hpp>
 
 namespace plt = matplotlibcpp;
