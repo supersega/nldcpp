@@ -1,5 +1,8 @@
 .vscode/
+__pycache__/
+.cache/
 build/
+media/
 doc/
 .DS_Store
 CMakeCache.txt

@@ -26,7 +26,7 @@ int main() {
     vector_xdd x = vector_xdd::Zero(2);
     dual omega = 0.05;
 
-    auto ip = periodic_parameters{1, 200};
+    auto ip = periodic_parameters_constant{1, 200};
 
     auto bvp = periodic<runge_kutta_4>(non_autonomous(duffing), ip);
 

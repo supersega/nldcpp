@@ -1,3 +1,4 @@
+#include "nld/autocont/periodic_parameters.hpp"
 constexpr auto PI = 3.14159265358979323846264338327950288;
 #include <fstream>
 #include <iostream>
@@ -36,7 +37,7 @@ int main() {
         continuation_parameters params(newton_parameters(25, 0.000005), 10.1,
                                        0.01, 0.01, direction::forward);
 
-        auto ip = periodic_parameters{1, 200};
+        auto ip = periodic_parameters_constant{1, 200};
         dual A = 1.0 * i;
         auto bvp = periodic<runge_kutta_4>(
             non_autonomous(std::bind(duffing, _1, _2, _3, A)), ip);
@@ -64,7 +65,7 @@ int main() {
     continuation_parameters params(newton_parameters(25, 0.000005), 15.1, 0.01,
                                    0.01, direction::forward);
 
-    auto ip = periodic_parameters{1, 200};
+    auto ip = periodic_parameters_constant{1, 200};
     dual omega = 0.4;
     auto bvp = periodic<runge_kutta_4>(
         non_autonomous(std::bind(duffing, _1, _2, omega, _3)), ip);

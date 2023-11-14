@@ -720,12 +720,11 @@ struct CrackedCaddemiBeamDynamicSystem final {
                   << beam_traits.frequencies()(0) << std::endl;
     }
 
-    auto operator()(const nld::vector_xdd &y, nld::dual t,
-                    nld::dual omega) const {
+    auto operator()(const nld::vector_xdd &y) const {
         if (switch_function(y))
-            return opened_crack(y, t, omega);
+            return opened_crack(y, 0.0, 0.0);
         else
-            return closed_crack(y, t, omega);
+            return closed_crack(y, 0.0, 0.0);
     }
 
     using switch_fn = std::function<bool(const nld::vector_xdd &)>;
@@ -750,11 +749,11 @@ private:
 
         dy.head(degrees_of_freedom) = y.tail(degrees_of_freedom);
         dy.tail(degrees_of_freedom) =
-            -friction * y.tail(degrees_of_freedom) - f - fnl -
-            force_no_crack * nld::dual(sin(t * 2.0 * PI));
+            /*-friction * y.tail(degrees_of_freedom)*/ -f - fnl; /* -
+             force_no_crack * nld::dual(sin(t * 2.0 * PI))*/
 
-        dy *= 2.0 * PI;
-        dy /= omega;
+        // dy *= 2.0 * PI;
+        // dy /= omega;
 
         return dy;
     }
@@ -776,11 +775,11 @@ private:
 
         dy.head(degrees_of_freedom) = y.tail(degrees_of_freedom);
         dy.tail(degrees_of_freedom) =
-            -friction * y.tail(degrees_of_freedom) - f - fnl -
-            force_crack * nld::dual(sin(t * 2.0 * PI));
+            /*-friction * y.tail(degrees_of_freedom)*/ -f - fnl; /* -
+             force_crack * nld::dual(sin(t * 2.0 * PI));*/
 
-        dy *= 2.0 * PI;
-        dy /= omega;
+        // dy *= 2.0 * PI;
+        // dy /= omega;
 
         return dy;
     }
@@ -1096,6 +1095,89 @@ void integrate_eigen_mode2(CrackedBeam cracked_beam) {
         nld::integrate<nld::gauss_kronrod21>(mass, nld::segment{0.0, 1.0});
 }
 
+void remove_element(auto &v, unsigned int index) {
+    auto size = v.size() - 1;
+
+    if (index < size)
+        v.segment(index, size - index) = v.segment(index + 1, size - index);
+
+    v.conservativeresize(size);
+}
+
+void remove_column(auto &matrix, unsigned int coltoremove) {
+    auto numrows = matrix.rows();
+    auto numcols = matrix.cols() - 1;
+
+    if (coltoremove < numcols)
+        matrix.block(0, coltoremove, numrows, numcols - coltoremove) =
+            matrix.block(0, coltoremove + 1, numrows, numcols - coltoremove);
+
+    matrix.conservativeresize(numrows, numcols);
+}
+
+template <typename Ds>
+struct bind_wrt_unknown : nld::jacobian_mixin<bind_wrt_unknown<Ds>> {
+    bind_wrt_unknown(Ds &ds, std::size_t coord, double value, std::size_t dim)
+        : coord{coord}, value{value}, ds{ds}, dim{dim} {}
+
+    /// @brief operator() to be used by The Newton method
+    /// @param u the unknown vector [u_1, u2, ..., u_coord - 1, u_coord + 1,
+    /// ..., u_dim + 1]
+    auto operator()(const auto &u) const -> nld::vector_xdd {
+        nld::vector_xdd u_merged = merged_unknown(u);
+        return ds(u_merged);
+    }
+
+    auto merged_unknown(const auto &u) const -> nld::vector_xdd {
+        nld::vector_xdd u_merged(dim + 1);
+        u_merged << u.head(coord), value, u.tail(dim - coord);
+        return u_merged;
+    }
+
+private:
+    std::size_t coord;
+    double value;
+    std::size_t dim;
+    Ds &ds;
+};
+
+auto compute_initial_estimation_free(auto &ds, auto dofs) -> nld::vector_xdd {
+    auto dim = 2 * dofs;
+    nld::continuation_parameters params(nld::newton_parameters(100, 0.00005),
+                                        1.0, 0.001, 0.01,
+                                        nld::direction::reverse);
+
+    auto ip =
+        nld::periodic_parameters_adaptive{1, 1.0 / 2048, 1.0 / 128.0, 5.0e-6};
+    auto bvp = nld::periodic<nld::runge_kutta_45>(nld::autonomous(ds), ip);
+    auto bind = bind_wrt_unknown(bvp, 0, 0.005, dim);
+
+    nld::vector_xdd u0(dim);
+    // u0 << 0.00473749, -0.00433584, 0.0912594, -0.011132, -0.0523547, 4.48523;
+    u0 << nld::vector_xdd::Zero(dim - 1), 5.01818;
+
+    if (nld::newton(bind, wrt(u0), at(u0), nld::newton_parameters(50, 1.0e-6)))
+        std::cout << "Root value is : " << u0 << '\n';
+    else
+        std::cout << "Newton method does not converged \n";
+
+    return bind.merged_unknown(u0);
+    // auto [ode, state] = bvp.ode(un);
+
+    // auto sln = nld::runge_kutta_4::solution(
+    //     ode, nld::constant_step_parameters{0.0, 1.0, 400}, state);
+    // nld::vector_xd q1 = sln.col(0);
+    // nld::vector_xd q2 = sln.col(1);
+    //
+    // std::cout << "q1: \n" << q1 << std::endl;
+    //
+    // std::vector<double> q1_(q1.data(), q1.data() + q1.size());
+    // std::vector<double> q2_(q2.data(), q2.data() + q2.size());
+    //
+    // plt::named_plot("q1", q1_, q2_);
+    // plt::show();
+}
+
 int main(int argc, char *argv[]) {
     auto material = Material{7800, 2.1e11};
     auto geometry = Geometry{0.177, 0.01, 0.01};
@@ -1110,41 +1192,47 @@ int main(int argc, char *argv[]) {
     auto semnc = chcbeam.Phi(2);
 
     BeamTraits<CHTag> traits(beam);
+    const size_t dofs = 2;
     CrackedCaddemiBeamDynamicSystem<CHTag> ds{
-        cracked_beam, Force{beam.geometry.length / 2.0, 4'000.0}, 0.1, 3};
+        cracked_beam, Force{beam.geometry.length / 2.0, 1'500.0}, 0.01, dofs};
 
-    nld::vector_xdd y0(6);
-    y0 << 0.1, 0.1, 0.2, 0.2, 0.3, 0.4;
-    std::cout << ds(y0, 0, 0.2);
+    auto initial = compute_initial_estimation_free(ds, dofs);
+    nld::continuation_parameters params(nld::newton_parameters(100, 0.00002),
+                                        1.9, 0.000025, 0.001,
+                                        nld::direction::reverse);
 
-    nld::continuation_parameters params(nld::newton_parameters(100, 0.0005),
-                                        2.9, 0.001, 0.01,
-                                        nld::direction::forward);
+    auto ip = nld::periodic_parameters_constant{1, 900};
+    // auto ip =
+    // nld::periodic_parameters_adaptive{1, 1.0 / 600, 1.0 / 128.0, 4.0e-7};
+    auto bvp = nld::periodic<nld::runge_kutta_4>(nld::autonomous(ds), ip);
 
-    auto ip = nld::periodic_parameters{1, 300};
-    auto bvp = nld::periodic<nld::runge_kutta_4>(nld::non_autonomous(ds), ip);
+    nld::vector_xdd u0(2 * dofs + 1);
+    u0 << initial;
 
-    nld::vector_xdd u0(7);
-    u0 << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2;
-
-    nld::vector_xdd v0(7);
-    v0 << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0;
+    nld::vector_xdd v0(2 * dofs + 1);
+    v0 << -1.0, nld::vector_xdd::Zero(2 * dofs);
 
     std::cout << "Start\n";
 
     std::vector<double> Omega, A1;
     std::ofstream curve(
-        "/Volumes/Data/phd2023/compare_models_30_10_2023/curve_caddemi.txt",
+        "/Volumes/Data/phd2023/backbone_depth04/2dofs_y0_0.005_up.txt",
         std::ofstream::trunc);
-    std::ofstream pd(
-        "/Volumes/Data/phd2023/compare_models_30_10_2023/pd_caddemi.txt",
-        std::ofstream::trunc);
-    nld::vector_xdd sln_main_resonance(7);
+    // std::ofstream pd(
+    //     "/Volumes/Data/phd2023/compare_models_30_10_2023/pd_caddemi.txt",
+    //     std::ofstream::trunc);
+    nld::vector_xdd sln_stored(2 * dofs + 1);
     for (auto [solution, M, A] :
          nld::arc_length(bvp, params, u0,
                          nld::concat(nld::solution(), nld::monodromy(),
                                      nld::mean_amplitude(0)))) {
-        Omega.push_back((double)solution(solution.size() - 1));
+        nld::dual om = 2.0 * PI / solution(solution.size() - 1);
+        if (om < 0.0)
+            break;
+
+        sln_stored = solution;
+
+        Omega.push_back((double)om);
         A1.push_back((double)A);
         Eigen::EigenSolver<Eigen::MatrixXd> es(M);
         auto ev = es.eigenvalues();
@@ -1157,47 +1245,50 @@ int main(int argc, char *argv[]) {
                 auto im = ev(i).imag();
                 auto pdbiff = ((-1.02 < re) && (re < -0.98)) &&
                               ((-0.02 < im) && (im < 0.02));
-                if (pdbiff) {
-                    pd << (double)solution(solution.size() - 1) << ' '
-                       << (double)A << std::endl;
-                }
+                // if (pdbiff) {
+                // pd << (double)solution(solution.size() - 1) << ' '
+                // << (double)A << std::endl;
+                // }
             }
         }
-        auto frq = (double)solution(solution.size() - 1);
-        if (abs(frq - 1.2) < 0.01) {
-            sln_main_resonance = solution;
-            std::cout << "FRQ: " << frq << std::endl;
-        }
-        curve << (double)solution(solution.size() - 1) << ' ' << (double)A
-              << ' ' << (int)pred.all() << std::endl;
+        auto frq = (double)om;
+        // if (abs(frq - 1.2) < 0.01) {
+        // sln_main_resonance = solution;
+        // std::cout << "FRQ: " << frq << std::endl;
+        // }
+        curve << (double)om << ' ' << (double)A << ' ' << (int)pred.all()
+              << std::endl;
 
-        std::cout << "Omega: " << solution(solution.size() - 1) << std::endl;
+        std::cout << "Omega: " << om << std::endl;
     }
 
-    nld::dual omega_main = sln_main_resonance(sln_main_resonance.size() - 1);
-    nld::dual period_main = 2.0 * PI / omega_main;
-    nld::vector_xdd ic = sln_main_resonance.head(sln_main_resonance.size() - 1);
-    auto motions_near_main_resonance = nld::runge_kutta_4::solution(
-        ds, nld::constant_step_parameters{0.0, 10.0, 4000}, ic,
-        nld::arguments(omega_main));
+    std::cout << "sln_stored: " << sln_stored << std::endl;
 
-    nld::vector_xd q1_ = motions_near_main_resonance.col(0);
-    nld::vector_xd q2_ = motions_near_main_resonance.col(2);
-    nld::vector_xd time_ = Eigen::VectorXd::LinSpaced(
-        motions_near_main_resonance.rows(), 0.0, (double)period_main);
-    std::vector<double> q1(q1_.data(), q1_.data() + q1_.size());
-    std::vector<double> q2(q2_.data(), q2_.data() + q2_.size());
-    std::vector<double> time(time_.data(), time_.data() + time_.size());
-
-    std::ofstream sln("/Volumes/Data/phd2023/compare_models_30_10_2023/sln.txt",
-                      std::ofstream::trunc);
-
-    sln << motions_near_main_resonance;
+    // nld::dual omega_main = sln_main_resonance(sln_main_resonance.size() - 1);
+    // nld::dual period_main = 2.0 * PI / omega_main;
+    // nld::vector_xdd ic = sln_main_resonance.head(sln_main_resonance.size() -
+    // 1); auto motions_near_main_resonance = nld::runge_kutta_4::solution(
+    //     ds, nld::constant_step_parameters{0.0, 10.0, 4000}, ic,
+    //     nld::arguments(omega_main));
+    //
+    // nld::vector_xd q1_ = motions_near_main_resonance.col(0);
+    // nld::vector_xd q2_ = motions_near_main_resonance.col(2);
+    // nld::vector_xd time_ = Eigen::VectorXd::LinSpaced(
+    //     motions_near_main_resonance.rows(), 0.0, (double)period_main);
+    // std::vector<double> q1(q1_.data(), q1_.data() + q1_.size());
+    // std::vector<double> q2(q2_.data(), q2_.data() + q2_.size());
+    // std::vector<double> time(time_.data(), time_.data() + time_.size());
+    //
+    // std::ofstream
+    // sln("/Volumes/Data/phd2023/compare_models_30_10_2023/sln.txt",
+    //                   std::ofstream::trunc);
+    //
+    // sln << motions_near_main_resonance;
 
     // plt::named_plot("q1/q2", q1, q2);
-    plt::named_plot("q1", time, q1);
-    plt::named_plot("q2", time, q2);
-    // plt::named_plot("AFC", Omega, A1);
+    // plt::named_plot("q1", time, q1);
+    // plt::named_plot("q2", time, q2);
+    plt::named_plot("AFC", Omega, A1);
     plt::legend();
     plt::show();
 

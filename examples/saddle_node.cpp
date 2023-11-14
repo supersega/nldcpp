@@ -54,7 +54,7 @@ int main() {
     continuation_parameters params(newton_parameters(25, 0.0001), 15.5, 0.01,
                                    0.01, direction::reverse);
 
-    auto ip = periodic_parameters{1, 200};
+    auto ip = periodic_parameters_constant{1, 200};
     auto snb = saddle_node<runge_kutta_4>(non_autonomous(NLTVA), ip);
 
     vector_xdd2 u0(10);

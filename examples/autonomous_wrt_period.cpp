@@ -33,7 +33,7 @@ int main() {
     continuation_parameters params(newton_parameters(25, 0.00001), 2.1, 0.003,
                                    0.001, direction::forward);
 
-    auto ip = periodic_parameters{1, 200};
+    auto ip = periodic_parameters_constant{1, 200};
     auto bvp = periodic<runge_kutta_4>(autonomous(conservative), ip);
 
     vector_xdd u0(3);

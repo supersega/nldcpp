@@ -1,4 +1,5 @@
 // C++ includes
+#include "nld/autocont/periodic_parameters.hpp"
 constexpr auto PI = 3.14159265358979323846264338327950288;
 #include <fstream>
 #include <iostream>
@@ -125,7 +126,7 @@ int main() {
     continuation_parameters params(newton_parameters(25, 0.000005), 2.1, 0.003,
                                    0.003, direction::forward);
 
-    auto ip = periodic_parameters{1, 200};
+    auto ip = periodic_parameters_constant{1, 200};
     auto bvp = periodic<runge_kutta_4>(autonomous(simple_system_3), ip);
 
     vector_xdd u0(2);

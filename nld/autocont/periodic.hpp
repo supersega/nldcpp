@@ -57,9 +57,10 @@ public:
     /// @param ds Function which rep dynamic system (ODE).
     /// \f$\dot{q} = \theta(q, t, \lambda)\f$.
     /// @param parameters Parameters of boundary value problem.
-    explicit periodic(Ds ds, nld::periodic_parameters parameters)
+    template <typename P>
+    explicit periodic(Ds ds, P parameters)
         : periodic_base_t(std::forward<Ds>(ds)),
-          parameters(0, 1.0 * parameters.periods, parameters.intervals) {
+          parameters(parameters.to_integration_parameters()) {
         static_assert(
             is_non_autonomous_v<Ds> || is_autonomous_v<Ds>,
             "Wrong type for two_point_boundary_value_problem see docs");
@@ -174,8 +175,8 @@ auto integration_arguments(
 /// @param dynamic_system
 /// \f$\dot{q} = \theta(q, t, \lambda)\f$.
 /// @param parameters parameters of ODE integration
-template <OdeSolver S, typename Ds>
-auto periodic(Ds dynamic_system, nld::periodic_parameters parameters) {
+template <OdeSolver S, typename Ds, typename P>
+auto periodic(Ds dynamic_system, P parameters) {
     return internal::periodic<S, Ds>(std::move(dynamic_system),
                                      std::move(parameters));
 }

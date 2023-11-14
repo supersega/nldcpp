@@ -1,4 +1,5 @@
 // C++ includes
+#include "nld/autocont/periodic_parameters.hpp"
 #include "nld/core/aliases.hpp"
 constexpr auto PI = 3.14159265358979323846264338327950288;
 #include <cmath>
@@ -328,7 +329,7 @@ auto afc(std::size_t i) {
         continuation_parameters params(newton_parameters(100, 0.0005), 2.9,
                                        0.001, 0.01, direction::forward);
 
-        auto ip = periodic_parameters{1, 300};
+        auto ip = periodic_parameters_constant{1, 300};
         auto bvp = periodic<runge_kutta_4>(non_autonomous(ds), ip);
 
         vector_xdd u0(7);
