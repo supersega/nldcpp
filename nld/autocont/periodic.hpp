@@ -79,16 +79,14 @@ public:
     auto ode(const Vector &variables) const {
         using namespace std::placeholders;
         if constexpr (!PoincareEquationNeeded<Ds>) {
-            auto parameter = variables(variables.size() - 1);
+            Vector parameter = variables.tail(1);
             auto ds = std::bind(this->underlying_function(), _1, _2, parameter);
             Vector state = variables.head(variables.size() - 1);
 
             return std::tuple(ds, state);
         } else {
-            auto parameter = variables(variables.size() - 1);
-            auto period = variables(variables.size() - 2);
-            auto ds = std::bind(this->underlying_function(), _1, _2, period,
-                                parameter);
+            Vector parameters = variables.tail(2);
+            auto ds = std::bind(this->underlying_function(), _1, parameters);
             Vector state = variables.head(variables.size() - 2);
 
             return std::tuple(ds, state);
@@ -159,14 +157,13 @@ auto integration_arguments(
     if constexpr (!PoincareEquationNeeded<Fn>) {
         auto dim = variables.size();
         V state = variables.head(variables.size() - 1);
-        auto parameter = variables(dim - 1);
+        V parameter = variables.tail(1);
         return std::make_tuple(state, std::make_tuple(parameter));
     } else {
         auto dim = variables.size();
         V state = variables.head(variables.size() - 2);
-        auto period = variables(dim - 2);
-        auto parameter = variables(dim - 1);
-        return std::make_tuple(state, std::make_tuple(period, parameter));
+        V parameters = variables.tail(2);
+        return std::make_tuple(state, std::make_tuple(parameters));
     }
 }
 } // namespace internal

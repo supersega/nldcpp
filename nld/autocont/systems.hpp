@@ -1,10 +1,18 @@
 #pragma once
 
-#include "nld/core/utils.hpp"
 #include <nld/core.hpp>
 #include <type_traits>
 
 namespace nld {
+
+namespace concepts::ode {
+/// @brief Concept for ode to identify if it take continuation parameters.
+template <typename F, typename Y, typename T, typename P>
+concept SingleContinuationParameter = requires(F f, Y y, T t, P p) {
+    { f(y, t, p(0)) } -> Vector;
+};
+} // namespace concepts::ode
+
 namespace concepts::non_autonomous {
 template <typename F>
 concept RnToRnMap = requires(F f) {
@@ -50,8 +58,6 @@ struct non_autonomous final {
     explicit non_autonomous(Fn f) : function(f) {}
 
     /// @brief Operator to wrap function for earthier usage.
-    /// @details For now assume that Period or frequence is passed
-    /// explicitly, e.g. y' = f(t, t, T).
     /// @param y State variables for ODE.
     /// @param t Time.
     /// @param parameters Parameters for continuation.
@@ -60,7 +66,12 @@ struct non_autonomous final {
     auto operator()(const T &y, S t, P parameters) const
         requires concepts::non_autonomous::RnPlusOneToRnMap<Fn>
     {
-        return function(y, t, parameters);
+        // Currently only non autonomous systems support
+        // multiple continuation parameters.
+        if constexpr (concepts::ode::SingleContinuationParameter<Fn, T, S, P>)
+            return function(y, t, parameters(0));
+        else
+            return function(y, t, parameters);
     }
 
     /// @brief Operator to wrap function for earthier usage.
@@ -133,14 +144,14 @@ struct autonomous final {
     /// @brief Operator to wrap function for earthier usage.
     /// @param y State variables for ODE.
     /// @param t Time.
-    /// @param T Period.
-    /// @param parameters Parameters for continuation.
+    /// @param parameters system parameters, period and continuation.
     /// @returns Value of ODE right side at given point, time, parameters.
-    template <typename Y, typename S, typename Pd, typename P>
-    auto operator()(const Y &y, S t, Pd T, P parameters) const
+    template <typename Y, typename S, typename P>
+    auto operator()(const Y &y, S t, P parameters) const
         requires concepts::autonomous::RnPlusOneToRnMap<Fn>
     {
-        auto result = function(y, parameters);
+        auto T = parameters[0];
+        auto result = function(y, parameters[1]);
         // Time variable transformation t -> t / period,
         // To be able to evaluate period in each iteration
         result *= T;
