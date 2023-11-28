@@ -1150,7 +1150,7 @@ auto compute_initial_estimation_free(auto &ds, auto dofs) -> nld::vector_xdd {
     auto ip =
         nld::periodic_parameters_adaptive{1, 1.0 / 2048, 1.0 / 128.0, 5.0e-6};
     auto bvp = nld::periodic<nld::runge_kutta_45>(nld::autonomous(ds), ip);
-    auto bind = bind_wrt_unknown(bvp, 0, 0.005, dim);
+    auto bind = nld::bind_wrt_unknown(bvp, 0, 0.005, dim);
 
     nld::vector_xdd u0(dim);
     // u0 << 0.00473749, -0.00433584, 0.0912594, -0.011132, -0.0523547, 4.48523;
