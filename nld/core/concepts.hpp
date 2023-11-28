@@ -4,7 +4,11 @@
 
 #include <nld/core/aliases.hpp>
 #include <nld/core/utils.hpp>
+#include <type_traits>
 #include <utility>
+
+#include <Eigen/Core>
+#include <Eigen/Sparse>
 
 namespace nld {
 /// @brief The archetypes for concepts definition.
@@ -60,10 +64,13 @@ static_assert(Vector<archetypes::vector>,
 
 /// @brief Concept for ode.
 template <typename M>
-concept Matrix = requires(M m) {
-    // Matrix should have an operator() with (index, index)
-    requires Scalar<decltype(m(std::declval<index>(), std::declval<index>()))>;
-};
+concept DenseMatrix = std::is_base_of_v<Eigen::MatrixBase<M>, M>;
+
+template <typename M>
+concept SparseMatrix = std::is_base_of_v<Eigen::SparseMatrixBase<M>, M>;
+
+template <typename M>
+concept Matrix = DenseMatrix<M> || SparseMatrix<M>;
 
 /// @brief OdeSolver concept.
 /// @details OdeSolver should provide solution static function and end_solution
@@ -97,12 +104,11 @@ concept FunctionWithPreviousStepSolution =
 /// @brief Function which provides Jacobian method.
 /// @details Concept of function supports Jacobian evaluation.
 /// Jacobian computed in Neton method, if function provides
-/// two methods bellow, one of them will be used for computitions
-/// otherwice jacobian from autodiff will be used.
+/// method bellow, it will be used for computations
+/// otherwise jacobian from autodiff will be used.
 template <typename F, typename Wrt, typename At, typename R>
 concept Jacobian = requires(F f, Wrt wrt, At at, R &r) {
     { f.jacobian(wrt, at, r) } -> Matrix;
-    { f.jacobian(wrt, at) } -> Matrix;
 };
 
 /// @brief Function which provides Norm method
