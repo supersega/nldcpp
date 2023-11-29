@@ -1,5 +1,3 @@
-#include "nld/core/aliases.hpp"
-#include "nld/core/arguments.hpp"
 #include <Eigen/Sparse>
 #include <iostream>
 #include <matplotlibcpp.h>
@@ -10,6 +8,7 @@
 #include <utility>
 #include <vector>
 #define _USE_MATH_DEFINES
+#include <chrono>
 #include <math.h>
 
 namespace plt = matplotlibcpp;
@@ -154,7 +153,7 @@ auto interpolate(auto basis_builder, const nld::collocations::mesh &mesh,
 int main(int argc, char *argv[]) {
     std::cout << "Collocations!" << std::endl;
 
-    nld::collocations::mesh_parameters parameters{10, 3};
+    nld::collocations::mesh_parameters parameters{300, 4};
     nld::collocations::mesh mesh(
         parameters, nld::collocations::uniform_mesh_nodes,
         nld::collocations::legandre_collocation_points);
@@ -184,6 +183,8 @@ int main(int argc, char *argv[]) {
     auto u0 = initial_guess(parameters, 2);
     auto f = system(u0);
 
+    auto now = std::chrono::high_resolution_clock::now();
+
     if (auto info =
             nld::math::newton(system, wrt(u0.head(u0.size() - 1)), at(u0), np);
         info) {
@@ -191,6 +192,13 @@ int main(int argc, char *argv[]) {
                   << '\n';
         std::cout << "Great work: colobok u = " << u0.head(2) << '\n';
     }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::cout << "Time: "
+              << std::chrono::duration_cast<std::chrono::milliseconds>(end -
+                                                                       now)
+                     .count()
+              << "ms\n";
 
     {
         nld::vector_xdd u_ = u.head(u.size() - 1);

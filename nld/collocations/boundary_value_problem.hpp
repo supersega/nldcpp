@@ -61,9 +61,23 @@ struct boundary_value_problem final {
     /// @param at Variables to evaluate at
     /// @param v Value of the function
     template <typename Wrt, typename At, typename V>
-    auto jacobian(Wrt &&wrt, At &&at, V &&v) const -> nld::matrix_xd {
+    auto jacobian(Wrt &&wrt, At &&at, V &&v) const -> nld::sparse_matrix_xd {
+        auto m = parameters.collocation_points;
+        auto n = dimension;
+
         auto jac = autodiff::forward::jacobian(*this, wrt, at, v);
-        return jac;
+        nld::sparse_matrix_xd result(jac.rows(), jac.cols());
+        result.reserve(VectorXi::Constant(jac.cols(), 3 * m * n));
+
+        for (std::size_t i = 0; i < jac.cols(); ++i) {
+            for (std::size_t j = 0; j < jac.rows(); ++j) {
+                if (jac(j, i) != 0.0) {
+                    result.insert(j, i) = jac(j, i);
+                }
+            }
+        }
+
+        return result;
     }
 
     /// @brief Evaluate the boundary value problem
