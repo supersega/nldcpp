@@ -2,6 +2,7 @@
 #include <nld/core/dissable_warnings.hpp>
 
 #include <Eigen/Core>
+#include <Eigen/Sparse>
 #include <unsupported/Eigen/CXX11/Tensor>
 
 /* should be deleted - we have problem in autodiff*/
@@ -13,9 +14,8 @@ using namespace Eigen;
 namespace nld {
 
 /// Internal function wrt.
-template<typename... Args>
-auto wrt(Args&... args)
-{
+template <typename... Args>
+auto wrt(Args &...args) {
     return autodiff::wrtpack(args...);
 }
 
@@ -26,33 +26,35 @@ using index = Eigen::Index;
 using dual = autodiff::forward::dual;
 using dual2 = autodiff::forward::HigherOrderDual<2>;
 
-template<typename Real, int Rows, int Cols>
+template <typename Real, int Rows, int Cols>
 using matrix_generic = Eigen::Matrix<Real, Rows, Cols>;
 
-template<typename Real>
+template <typename Real>
 using vector_x = Eigen::Matrix<Real, -1, 1>;
 using vector_xd = vector_x<double>;
 
 using vector_xdd = vector_x<dual>;
 using vector_xdd2 = vector_x<dual2>;
 
-template<typename Real, int Size = -1>
+template <typename Real, int Size = -1>
 using matrix_x = Eigen::Matrix<Real, Size, Size, 0, Size, Size>;
 using matrix_xd = matrix_x<double>;
 
-template<int Size = -1>
+template <int Size = -1>
 using matrix_xdd = Eigen::Matrix<dual, Size, Size, 0, Size, Size>;
 
-template<int Dim>
+using sparse_matrix_xd = Eigen::SparseMatrix<double>;
+
+template <int Dim>
 using tensor = Eigen::Tensor<double, Dim>;
 
 using tensor_1d = Eigen::Tensor<double, 1>;
 using tensor_2d = Eigen::Tensor<double, 2>;
 using tensor_3d = Eigen::Tensor<double, 3>;
 
-template<typename U>
-struct is_nonlinear_function : std::false_type { };
+template <typename U>
+struct is_nonlinear_function : std::false_type {};
 
-template<typename U>
+template <typename U>
 constexpr auto is_nonlinear_function_v = is_nonlinear_function<U>::value;
-}
+} // namespace nld
