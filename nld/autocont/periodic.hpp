@@ -86,7 +86,8 @@ public:
             return std::tuple(ds, state);
         } else {
             Vector parameters = variables.tail(2);
-            auto ds = std::bind(this->underlying_function(), _1, parameters);
+            auto ds =
+                std::bind(this->underlying_function(), _1, _2, parameters);
             Vector state = variables.head(variables.size() - 2);
 
             return std::tuple(ds, state);
@@ -154,17 +155,13 @@ template <typename S, typename Fn, typename V>
 auto integration_arguments(
     const V &variables,
     [[maybe_unused]] const nld::internal::periodic<S, Fn> &pc) {
-    if constexpr (!PoincareEquationNeeded<Fn>) {
-        auto dim = variables.size();
-        V state = variables.head(variables.size() - 1);
-        V parameter = variables.tail(1);
-        return std::make_tuple(state, std::make_tuple(parameter));
-    } else {
-        auto dim = variables.size();
-        V state = variables.head(variables.size() - 2);
-        V parameters = variables.tail(2);
-        return std::make_tuple(state, std::make_tuple(parameters));
-    }
+    using pd = nld::internal::periodic<S, Fn>;
+    constexpr auto parameters_size = pd::non_state_variables();
+
+    auto dim = variables.size();
+    V state = variables.head(dim - parameters_size);
+    V parameters = variables.tail(parameters_size);
+    return std::make_tuple(state, std::make_tuple(parameters));
 }
 } // namespace internal
 

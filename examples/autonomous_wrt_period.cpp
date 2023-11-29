@@ -1,4 +1,5 @@
 
+#include "nld/core/aliases.hpp"
 constexpr auto PI = 3.14159265358979323846264338327950288;
 #include <cmath>
 #include <fstream>
@@ -26,14 +27,28 @@ auto conservative(const vector_xdd &u) {
     return f;
 }
 
+/// @brief Conservative system with periodic solutions
+/// @details This system has periodic solutions, in examples
+/// of AUTO it described as "Model with vectical Hopf"
+/// and we involve 'lambda' into continuation process, but
+/// so poincare equation is needed
+auto conservative_with_parameter(const vector_xdd &u, nld::dual lambda) {
+    vector_xdd f(2);
+
+    f[0] = lambda - u[1];
+    f[1] = u[0] - u[0] * u[0];
+
+    return f;
+}
+
 int main() {
     ofstream fs("afc_loop.csv");
     fs << 'x' << ';' << 'y' << endl;
 
-    continuation_parameters params(newton_parameters(25, 0.00001), 2.1, 0.003,
-                                   0.001, direction::forward);
+    continuation_parameters params(newton_parameters(25, 0.0001), 4.1, 0.003,
+                                   0.00025, direction::forward);
 
-    auto ip = periodic_parameters_constant{1, 200};
+    auto ip = periodic_parameters_constant{1, 300};
     auto bvp = periodic<runge_kutta_4>(autonomous(conservative), ip);
 
     vector_xdd u0(3);
@@ -59,7 +74,7 @@ int main() {
 
     plt::ylabel(R"($A_1$)");
     plt::xlabel(R"($T$)");
-    plt::xlim(6.25, 8.0);
+    // plt::xlim(6.25, 8.0);
     plt::named_plot("Saddle Node", L, Am, "-b");
     plt::show();
 }
