@@ -29,7 +29,7 @@ struct collocation_on_elements final {
         auto M = collocations_mesh.collocation_points.size();
         std::size_t m = M / N;
 
-        nld::matrix_xd result(2, m + 1);
+        nld::matrix_xd result(m + 1, 2);
         for (std::size_t i = 0; i < 2; ++i) {
 
             nld::segment interval{collocations_mesh.nodes[in - 1 + i],
@@ -38,7 +38,7 @@ struct collocation_on_elements final {
 
             double t = collocations_mesh.nodes[in];
             for (std::size_t j = 0; j < m + 1; ++j) {
-                result(i, j) = basis(j, t);
+                result(j, i) = basis(j, t);
             }
         }
 
@@ -58,11 +58,11 @@ struct collocation_on_elements final {
                               collocations_mesh.nodes[ie + 1]};
         auto basis = basis_builder(interval, m);
 
-        nld::matrix_xd result(m, m + 1);
+        nld::matrix_xd result(m + 1, m);
         for (std::size_t i = 0; i < m; ++i) {
             double t = collocations_mesh.collocation_points[shift + i];
             for (std::size_t j = 0; j < m + 1; ++j) {
-                result(i, j) = basis(j, t);
+                result(j, i) = basis(j, t);
             }
         }
 
@@ -83,7 +83,7 @@ struct collocation_on_elements final {
                               collocations_mesh.nodes[ie + 1]};
         auto basis = basis_builder(interval, m);
 
-        nld::matrix_xd result(m, m + 1);
+        nld::matrix_xd result(m + 1, m);
         for (std::size_t i = 0; i < m; ++i) {
             nld::dual t = collocations_mesh.collocation_points[shift + i];
             for (std::size_t j = 0; j < m + 1; ++j) {
@@ -91,7 +91,7 @@ struct collocation_on_elements final {
                 using autodiff::forward::wrt;
 
                 auto dldt = autodiff::derivative(basis, wrt(t), at(j, t));
-                result(i, j) = dldt;
+                result(j, i) = dldt;
             }
         }
 

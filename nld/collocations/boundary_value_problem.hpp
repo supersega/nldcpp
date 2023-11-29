@@ -96,8 +96,8 @@ struct boundary_value_problem final {
                 for (std::size_t l = 0; l < m + 1; ++l) {
                     for (std::size_t i = 0; i < n; ++i) {
                         auto q = u[j * (m + 1) * n + l * n + i];
-                        p[i] += values(k, l) * q;
-                        p_prime[i] += derivatives(k, l) * q;
+                        p[i] += values(l, k) * q;
+                        p_prime[i] += derivatives(l, k) * q;
                     }
                 }
 
@@ -113,8 +113,8 @@ struct boundary_value_problem final {
                     for (std::size_t i = 0; i < n; ++i) {
                         auto ql = u[j * (m + 1) * n + l * n + i];
                         auto qr = u[(j + 1) * (m + 1) * n + l * n + i];
-                        continuity[i] += values_in_mesh_node(0, l) * ql -
-                                         values_in_mesh_node(1, l) * qr;
+                        continuity[i] += values_in_mesh_node(l, 0) * ql -
+                                         values_in_mesh_node(l, 1) * qr;
                     }
                 }
 
