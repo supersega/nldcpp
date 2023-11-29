@@ -1,3 +1,5 @@
+#include "nld/core/aliases.hpp"
+#include "nld/core/arguments.hpp"
 #include <Eigen/Sparse>
 #include <iostream>
 #include <matplotlibcpp.h>
@@ -45,27 +47,18 @@ auto first_order(const nld::vector_xdd &u, nld::dual t) -> nld::vector_xdd {
     return f;
 }
 
-auto shooting_system(const nld::vector_xdd &u0) -> nld::vector_xdd {
-
-    auto u1 = nld::math::runge_kutta_4::end_solution(
-        first_order, nld::math::constant_step_parameters{0.0, 1.0, 300}, u0);
-
-    nld::vector_xdd f(1);
-    f[0] = u0[0] + u1[0];
-
-    return f;
-}
-
 template <typename F>
 struct shooting_system_impl {
     explicit shooting_system_impl(F &&f) : function(std::forward<F>(f)) {}
 
     auto operator()(const nld::vector_xdd &u0) const -> nld::vector_xdd {
 
+        nld::vector_xdd u0_ = u0.head(u0.size() - 1);
         auto u1 = nld::math::runge_kutta_4::end_solution(
-            function, nld::math::constant_step_parameters{0.0, 1.0, 300}, u0);
+            function, nld::math::constant_step_parameters{0.0, 1.0, 300}, u0_,
+            std::tuple(nld::vector_xdd{u0.tail(1)}));
 
-        nld::vector_xdd f = u0 - u1;
+        nld::vector_xdd f = u0_ - u1;
 
         return f;
     }
@@ -76,16 +69,6 @@ struct shooting_system_impl {
 template <typename F>
 shooting_system_impl(F &&f) -> shooting_system_impl<F>;
 
-auto shooting_system_2(const nld::vector_xdd &u0) -> nld::vector_xdd {
-
-    auto u1 = nld::math::runge_kutta_4::end_solution(
-        conservative, nld::math::constant_step_parameters{0.0, 1.0, 300}, u0);
-
-    nld::vector_xdd f = u0 - u1;
-
-    return f;
-}
-
 auto initial_guess(nld::collocations::mesh_parameters parameters,
                    std::size_t dimension) -> nld::vector_xdd {
     nld::vector_xdd u0(dimension);
@@ -95,8 +78,9 @@ auto initial_guess(nld::collocations::mesh_parameters parameters,
     auto m = parameters.collocation_points;
     std::size_t n = dimension;
 
-    nld::vector_xdd u(N * n * m + (N - 1) * n + n);
+    nld::vector_xdd u(N * n * m + (N - 1) * n + n + 1);
     u.head(n) = u0;
+    u(u.size() - 1) = 2.0 * M_PI / 0.95;
 
     double t = 0.0;
     double dt = 1.0 / (N * (m + 1));
@@ -122,7 +106,8 @@ auto initial_guess(nld::collocations::mesh_parameters parameters,
     return u;
 }
 
-nld::vector_xdd duffing(const nld::vector_xdd &y, nld::dual t) {
+nld::vector_xdd duffing(const nld::vector_xdd &y, nld::dual t,
+                        const nld::vector_xdd &p) {
     nld::vector_xdd dy(y.size());
 
     nld::dual t8 = cos(2.0 * M_PI * t);
@@ -131,7 +116,7 @@ nld::vector_xdd duffing(const nld::vector_xdd &y, nld::dual t) {
     dy[1] = -0.1e-1 * y[1] - 0.1000000000e1 * y[0] -
             0.1499999998e2 * y[0] * y[0] * y[0] - 0.8600261454e-2 * t8;
 
-    auto T = 2.0 * M_PI / 0.95;
+    auto T = p(0);
     dy *= T;
 
     return dy;
@@ -180,11 +165,13 @@ int main(int argc, char *argv[]) {
         mesh, basis_builder);
 
     auto np = nld::math::newton_parameters(10, 0.00005);
-    nld::vector_xdd u(2);
+    nld::vector_xdd u(3);
     u[0] = -7.51716e-05;
     u[1] = 0.000116238;
+    u[2] = 2.0 * M_PI / 0.95;
     auto sh = shooting_system_impl(duffing);
-    if (auto info = nld::math::newton(sh, wrt(u), at(u), np); info) {
+    if (auto info = nld::math::newton(sh, wrt(u.head(u.size() - 1)), at(u), np);
+        info) {
         std::cout << "Iterations done = " << info.number_of_done_iterations
                   << '\n';
         std::cout << "Great work u = " << u << '\n';
@@ -197,15 +184,19 @@ int main(int argc, char *argv[]) {
     auto u0 = initial_guess(parameters, 2);
     auto f = system(u0);
 
-    if (auto info = nld::math::newton(system, wrt(u0), at(u0), np); info) {
+    if (auto info =
+            nld::math::newton(system, wrt(u0.head(u0.size() - 1)), at(u0), np);
+        info) {
         std::cout << "Iterations done = " << info.number_of_done_iterations
                   << '\n';
         std::cout << "Great work: colobok u = " << u0.head(2) << '\n';
     }
 
     {
+        nld::vector_xdd u_ = u.head(u.size() - 1);
         auto solution = nld::math::runge_kutta_4::solution(
-            duffing, nld::math::constant_step_parameters{0.0, 1.0, 300}, u);
+            duffing, nld::math::constant_step_parameters{0.0, 1.0, 300}, u_,
+            std::tuple(nld::vector_xdd{u.tail(1)}));
 
         nld::vector_xd xE = solution.col(0);
         nld::vector_xd yE = solution.col(1);
@@ -219,22 +210,8 @@ int main(int argc, char *argv[]) {
         plt::named_plot("shooting curve", x, y);
     }
     {
-        u[0] = u0[0];
-        u[1] = u0[1];
-        auto solution = nld::math::runge_kutta_4::solution(
-            duffing, nld::math::constant_step_parameters{0.0, 1.0, 300}, u);
-
-        nld::vector_xd yE = solution.col(0);
-        nld::vector_xd xE = solution.col(1);
-        std::vector<double> y(yE.data(), yE.data() + yE.size());
-        std::vector<double> x(xE.data(), xE.data() + xE.size());
-        std::vector<double> t(y.size());
-        for (std::size_t i = 0; i < y.size(); ++i) {
-            t[i] = i * 1.0 / (y.size() - 1);
-        }
-
-        nld::vector_xd u_0(u0.size() / 2);
-        nld::vector_xd u_1(u0.size() / 2);
+        nld::vector_xd u_0((u0.size() - 1) / 2);
+        nld::vector_xd u_1((u0.size() - 1) / 2);
         for (std::size_t i = 0; i < u_0.size(); ++i) {
             u_0[i] = (double)u0[i * 2];
             u_1[i] = (double)u0[i * 2 + 1];

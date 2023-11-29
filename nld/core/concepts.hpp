@@ -20,6 +20,10 @@ struct scalar {
 
     template <typename U>
     scalar &operator=(U &&other);
+
+    operator double() const;
+    operator nld::dual() const;
+    operator nld::dual2() const;
 };
 
 /// @brief The vector type used to define vectors.
@@ -29,6 +33,9 @@ struct vector {
 
     template <typename T>
     auto cast() const -> nld::vector_x<T>;
+
+    template <typename T>
+    operator nld::vector_x<T>() const;
 };
 
 /// @brief The ode type used to define ode.

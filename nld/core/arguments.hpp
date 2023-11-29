@@ -1,5 +1,7 @@
 #pragma once
 
+#include <tuple>
+
 namespace nld {
 
 /// @brief Function to pass additional arguments into algorithms.
@@ -8,8 +10,8 @@ namespace nld {
 /// Note: this function does not extends lifetime.
 /// @param args just arguments.
 /// @returns Tuple of arguments.
-template<typename... Args>
-inline constexpr auto arguments(Args&&... args) -> std::tuple<Args&&...> {
+template <typename... Args>
+inline constexpr auto arguments(Args &&...args) -> std::tuple<Args &&...> {
     return std::forward_as_tuple(std::forward<Args>(args)...);
 }
 
@@ -17,8 +19,6 @@ inline constexpr auto arguments(Args&&... args) -> std::tuple<Args&&...> {
 /// @details When we want to note that no additional arguments
 /// will be added to algorithm, we use this function to show it.
 /// @returns Empty tuple.
-inline constexpr auto no_arguments() -> std::tuple<> {
-    return arguments();
-}
+inline constexpr auto no_arguments() -> std::tuple<> { return arguments(); }
 
-}
+} // namespace nld

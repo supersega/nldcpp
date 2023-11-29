@@ -11,6 +11,18 @@
 #include <utility>
 
 namespace nld::collocations {
+
+namespace concepts {
+template <typename Fn>
+concept CollocationFunction = requires(Fn f) {
+    {
+        f(std::declval<nld::archetypes::vector>(),
+          std::declval<nld::archetypes::scalar>(),
+          std::declval<nld::archetypes::vector>())
+    } -> nld::Vector;
+};
+} // namespace concepts
+
 /// @brief Boundary value problem
 /// @tparam F Type of the function
 /// @tparam Bc Type of the boundary conditions
@@ -18,11 +30,11 @@ namespace nld::collocations {
 /// @details This class represents a boundary value problem of the form
 /// \f[
 ///    \begin{cases}
-///    \mathbf{u}'(t) = \mathbf{f}(\mathbf{u}(t), t) \\
+///    \mathbf{u}'(t) = \mathbf{f}(\mathbf{u}(t), t, p) \\
 ///    \mathbf{b}(\mathbf{u}(t_0), \mathbf{u}(t_N)) = 0 \\
 ///    \end{cases}
 /// \f]
-template <typename F, typename Bc, typename Basis>
+template <concepts::CollocationFunction F, typename Bc, typename Basis>
 struct boundary_value_problem final {
     /// @brief Create a boundary value problem
     /// @param f Function of the boundary value problem
@@ -69,6 +81,9 @@ struct boundary_value_problem final {
         nld::vector_xdd f(N * n * m + (N - 1) * n + n);
         f = nld::vector_xdd::Zero(N * n * m + (N - 1) * n + n);
 
+        // TODO: add support for multiple parameters
+        auto parameters = u.tail(1);
+
         for (std::size_t j = 0; j < N; ++j) {
             auto values = evaluator.values_in_collocation_points(j);
             auto derivatives = evaluator.derivatives_in_collocation_points(j);
@@ -86,7 +101,7 @@ struct boundary_value_problem final {
                     }
                 }
 
-                auto f_p = function(p, t);
+                auto f_p = function(p, t, parameters);
                 f.segment(j * (m + 1) * n + k * n, n) = p_prime - f_p;
             }
 
@@ -108,7 +123,7 @@ struct boundary_value_problem final {
         }
 
         f.segment(N * m * n + (N - 1) * n, n) =
-            boundary_conditions(u.head(n), u.tail(n));
+            boundary_conditions(u.head(n), u.tail(n + 1).head(n));
 
         return f;
     }
@@ -124,7 +139,7 @@ private:
     mesh grid;                  ///< Mesh of the boundary value problem
 };
 
-template <typename F, typename Bc, typename Basis>
+template <concepts::CollocationFunction F, typename Bc, typename Basis>
 boundary_value_problem(F &&, Bc &&, Basis &&,
                        nld::collocations::mesh_parameters, std::size_t)
     -> boundary_value_problem<F, Bc, Basis>;
