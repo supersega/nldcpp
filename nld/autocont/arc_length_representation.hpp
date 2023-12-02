@@ -5,43 +5,46 @@
 #include <nld/autocont/jacobian_mixin.hpp>
 
 namespace nld {
-/// @brief Class which represent function as nonlinear function with arc length parametrization.
-/// @details This class can be used for pseudo arc length continuation algorithm. We assume that
-/// functions agreed with library interfaces. The function should have the next signature:
-/// fn: Vector(N+1) -> Vector(N), where the last input argument is a continuation parameter.
+/// @brief Class which represent function as nonlinear function with arc length
+/// parametrization.
+/// @details This class can be used for pseudo arc length continuation
+/// algorithm. We assume that functions agreed with library interfaces. The
+/// function should have the next signature: fn: Vector(N+1) -> Vector(N), where
+/// the last input argument is a continuation parameter.
 /// @see concepts.hpp
 /// @tparam F function.
 /// @tparam V N dimensional vector.
 /// @tparam Real real number.
-template<typename F, typename V, typename Real>
-struct arc_length_representation final : nld::jacobian_mixin<arc_length_representation<F, V, Real>> {
+template <typename F, typename V, typename Real>
+struct arc_length_representation final
+    : nld::jacobian_mixin<arc_length_representation<F, V, Real>> {
     /// @brief Create arc length parametrization of function.
     /// @param function nonlinear function.
     /// @param point computed point on previous continuation step.
     /// @param tangent computed tangent on previous continuation step.
     /// @param ds step to compute arc length equation.
-    explicit arc_length_representation(F&& fn, const V& point, const V& tangent, Real ds) :
-        function{ std::forward<F>(fn) }, previous_point{ point }, previous_tangent{ tangent }, step{ ds }
-    {
+    explicit arc_length_representation(F &&fn, const V &point, const V &tangent,
+                                       Real ds)
+        : function{std::forward<F>(fn)}, previous_point{point},
+          previous_tangent{tangent}, step{ds} {
         if constexpr (nld::FunctionWithPreviousStepSolution<F>)
             function.set_previous_solution(previous_point);
     }
 
     /// @brief Get underlying function.
-    /// @details Get nonlinear function with next signature: fn(Vector) -> Vector,
-    /// Useful in map function.s
+    /// @details Get nonlinear function with next signature: fn(Vector) ->
+    /// Vector, Useful in map function.s
     /// @return underlying nonlinear function.
-    auto underlying_function() -> F& {
-        return function;
-    }
+    auto underlying_function() -> F & { return function; }
 
     /// @brief Nonlinear system plus Keller's arc length equation.
     /// @details Evaluate nonlinear function at given ponit,
     /// then compute Keller's equation in that point.
-    /// @param variables - N+1 dimensional point where we want to evaluate function.
+    /// @param variables - N+1 dimensional point where we want to evaluate
+    /// function.
     /// @return Value of nonlinear function at given point.
-    template<typename Vec>
-    auto operator() (Vec& variables) const {
+    template <typename Vec>
+    auto operator()(Vec &variables) const {
         const auto dim = variables.size();
 
         Vec value(dim);
@@ -60,8 +63,8 @@ struct arc_length_representation final : nld::jacobian_mixin<arc_length_represen
     /// @param at Point where we evaluate jacobian.
     /// @param v Value of function if given point.
     /// @return Jacobi matrix.
-    template<typename Wrt, typename At, typename Result>
-    auto jacobian(Wrt&& wrt, At&& at, Result& v) const {
+    template <typename Wrt, typename At, typename Result>
+    auto jacobian(Wrt &&wrt, At &&at, Result &v) const {
         const auto dim = autodiff::forward::detail::count(wrt);
         v.resize(dim);
 
@@ -70,7 +73,7 @@ struct arc_length_representation final : nld::jacobian_mixin<arc_length_represen
         nld::matrix_xd J(dim, dim);
         J.topLeftCorner(dim - 1, dim) = function.jacobian(wrt, at, value);
 
-        auto keller = [*this](auto& val) { return arc_length_equation(val); };
+        auto keller = [*this](auto &val) { return arc_length_equation(val); };
         auto dkeller = autodiff::forward::gradient(keller, wrt, at, v(dim - 1));
 
         J.bottomRows(1) = dkeller.transpose();
@@ -78,24 +81,16 @@ struct arc_length_representation final : nld::jacobian_mixin<arc_length_represen
         return J;
     }
 
-    /// @brief Jacobian of dynamic system.
-    /// @param wrt Variables w.r.t. we evaluate jacobian.
-    /// @param at Point where we evaluate jacobian.
-    /// @return Jacobi matrix.
-    template<typename Wrt, typename At>
-    auto jacobian(Wrt&& wrt, At&& at) const {
-        using Result = decltype(std::apply(function, at));
-        Result r;
-        return jacobian(wrt, at, r);
-    }
-
     /// @brief Tangential to bifurcation curve at given point.
     /// @param variables N+1 unknown variables.
     /// @return Tangential at point variables.
-    template<typename Vec>
-    auto tangential(Vec& variables) const -> Vec {
+    template <typename Vec>
+    auto tangential(Vec &variables) const -> Vec {
         // Tangential can be evaluated using Jacobi matrix of AL representation
-        auto jac = this->jacobian(wrt(variables), at(variables));
+        using Result = decltype(std::apply(*this, at(variables)));
+
+        Result result;
+        auto jac = this->jacobian(wrt(variables), at(variables), result);
 
         const auto dim = jac.rows();
 
@@ -115,19 +110,21 @@ struct arc_length_representation final : nld::jacobian_mixin<arc_length_represen
     /// @brief Norm of function at given point.
     /// @param at point.
     /// @return Norm at point.
-    template<typename At>
-    auto norm(At&& at) const {
+    template <typename At>
+    auto norm(At &&at) const {
         auto value = std::apply(*this, at);
         return value.head(value.size() - 1).norm();
     }
 
     /// @brief Set previous solution.
-    /// @details This will be called on Newton iteration. We got to eval some equations,
-    /// which e.g. Period condition on each iteration. So, all supported functions must
-    /// implement this method, and we will just propagate this to target.
+    /// @details This will be called on Newton iteration. We got to eval some
+    /// equations, which e.g. Period condition on each iteration. So, all
+    /// supported functions must implement this method, and we will just
+    /// propagate this to target.
     /// @param solution - previous solution
-    template<typename Vec, typename Fo = F, std::enable_if_t<FunctionWithPreviousStepSolution<Fo>>...>
-    void set_previous_solution(const Vec& solution) {
+    template <typename Vec, typename Fo = F,
+              std::enable_if_t<FunctionWithPreviousStepSolution<Fo>>...>
+    void set_previous_solution(const Vec &solution) {
         function.set_previous_solution(solution);
     }
 
@@ -136,15 +133,17 @@ struct arc_length_representation final : nld::jacobian_mixin<arc_length_represen
     /// All data which we need to build Keller's arc length data.
     /// @param point - previous point on branch.
     /// @param tangent - previous tangent at point on branch.
-    template<typename Vec>
-    void set_arc_length_properties(const Vec& point, const Vec& tangent, Real ds) {
+    template <typename Vec>
+    void set_arc_length_properties(const Vec &point, const Vec &tangent,
+                                   Real ds) {
         previous_point = point;
         previous_tangent = tangent;
         step = ds;
     }
+
 private:
-    template<typename Vec>
-    auto arc_length_equation(Vec& variables) const {
+    template <typename Vec>
+    auto arc_length_equation(Vec &variables) const {
         auto keller = (variables - previous_point).dot(previous_tangent) - step;
         return keller;
     }
@@ -155,6 +154,7 @@ private:
     Real step;          ///< Arc length step (delta(s)).
 };
 
-template<typename D, typename V, typename F>
-arc_length_representation(D&&, const V&, const V&, F)->arc_length_representation<D, V, F>;
-}
+template <typename D, typename V, typename F>
+arc_length_representation(D &&, const V &, const V &, F)
+    -> arc_length_representation<D, V, F>;
+} // namespace nld
