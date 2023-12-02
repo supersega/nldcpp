@@ -16,8 +16,7 @@ namespace nld {
 /// @tparam V N dimensional vector.
 /// @tparam Real real number.
 template <typename F, typename V, typename Real>
-struct arc_length_representation final
-    : nld::jacobian_mixin<arc_length_representation<F, V, Real>> {
+struct arc_length_representation final {
     /// @brief Create arc length parametrization of function.
     /// @param function nonlinear function.
     /// @param point computed point on previous continuation step.
