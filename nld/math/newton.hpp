@@ -14,6 +14,11 @@ namespace detail {
 template <typename F, typename Wrt, typename At, typename Float>
 bool newton_step(F &&f, Wrt &&initial, At &&at, Float tolerance);
 
+/// @brief Implementation of Newton method, which comute jacobian matrix
+/// in all input points.
+template <typename F, typename At, typename Float>
+bool newton_step(F &&f, At &at, Float tolerance);
+
 /// @brief Moore-Penrose-Newton correction implementation.
 /// @details Moore-Penrose method a bit complicated, we don't able
 /// to create representation class for it. So we create separate
@@ -26,25 +31,6 @@ bool moore_penrose_newton_step(F &&f, Wrt &&initial_guess,
 
 /// Newton method function
 /// @details
-/// If number of iteration will by greater than max_iterations
-/// from parameters function will return false.
-/// Note: function generate warning if result not cheeked.<br>
-/// Example of usage:
-/// @code
-/// auto fun(nld::vector_xdd& x) -> nld::vector_xdd {
-///     nld::vector_xdd y(x.size());
-///     y(0) = x(0) + x(1) - 3;
-///     y(1) = x(0) * x(0) + x(1) * x(1) - 9;
-///     return y;
-/// }
-///
-/// int main() {
-///     nld::vector_xdd x = nld::vector_xdd::Zero(3);
-///     if (nld::newton(fun, nld::wrt(x)), nld::newton_parameters { 5, 1.0e-4 })
-///         return 0;
-///     return 1;
-/// }
-/// @endcode
 /// @param function Nonlinear function.
 /// @param wrt Variables which will be variated.
 /// @param at Point where function should be evaluated.
@@ -63,35 +49,21 @@ template <typename F, typename Wrt, typename At, typename P>
     return {parameters.max_iterations, false};
 }
 
-/// Lazy variant of Newton method.
-/// @details
-/// Use Newton method as functor. Just wrap newton function.<br>
-/// Example of usage:
-/// @code
-/// auto fun(nld::vector_xdd& x) -> nld::vector_xdd {
-///     nld::vector_xdd y(x.size());
-///     y(0) = x(0) + x(1) - 3;
-///     y(1) = x(0) * x(0) + x(1) * x(1) - 9;
-///     return y;
-/// }
-///
-/// int main() {
-///     nld::vector_xdd x = nld::vector_xdd::Zero(3);
-///     auto newton = nld::newton(fun, nld::newton_parameters { 5, 1.0e-4 });
-///     /// some stuff ...
-///     if (newton(nld::wrt(x), nld::at(x)))
-///         return 0;
-///     return 1;
-/// }
-/// @endcode
-/// @param function nonlinear function
-/// @param parameters Newton method parameters
-/// @return result callable object
-template <typename F, typename Parameters>
-[[nodiscard]] auto newton(F &&function, Parameters parameters) {
-    return [&](auto &&wrt, auto &&at) {
-        return nld::math::newton(function, wrt, at, parameters);
-    };
+/// Newton method function
+/// @param function Nonlinear function.
+/// @param at Point where function should be evaluated.
+/// @param parameters Newton method parameters.
+/// @return Result of computation.
+template <typename F, typename At, typename P>
+[[nodiscard]] auto newton(F &&f, At &at, P parameters) -> newton_info {
+    // Loop of Newton method
+    using std::forward;
+    auto [max_iterations, tolerance] = parameters;
+    while (max_iterations--)
+        if (detail::newton_step(f, at, tolerance))
+            return {parameters.max_iterations - max_iterations, true};
+    // If iterations not success return false
+    return {parameters.max_iterations, false};
 }
 
 /// Moore-Penrose-Newton correction.
@@ -136,6 +108,16 @@ auto jacobian(const Function &f, Wrt &&wrt, At &&at, Result &&F) {
         return autodiff::forward::jacobian(f, wrt, at, F);
 }
 
+// Internal function to get jacobian. Need it since nld wrappers has jacobian
+// method.
+template <typename Function, typename At, typename Result>
+auto jacobian(Function &f, At &at, Result &F) {
+    if constexpr (JacobianFull<Function, At, Result>)
+        return f.jacobian(at, F);
+    else
+        return autodiff::forward::jacobian(f, nld::wrt(at), nld::at(at), F);
+}
+
 // Solve linear system using QR decomposition for dense matrix.
 inline auto solve(const nld::matrix_xd &A, const nld::vector_xd &b)
     -> nld::vector_xd {
@@ -146,14 +128,10 @@ inline auto solve(const nld::matrix_xd &A, const nld::vector_xd &b)
 inline auto solve(nld::sparse_matrix_xd &A, const nld::vector_xd &b)
     -> nld::vector_xd {
     Eigen::SparseLU<nld::sparse_matrix_xd, Eigen::COLAMDOrdering<int>> solver;
-    // fill A and b;
-    // Compute the ordering permutation vector from the structural pattern of A
+
     solver.analyzePattern(A);
-    // Compute the numerical factorization
     solver.factorize(A);
-    std::cout << "Non zeros: " << A.nonZeros()
-              << "; Total: " << A.rows() * A.cols() << std::endl;
-    // Use the factors to solve the linear system
+
     return solver.solve(b);
 }
 
@@ -178,6 +156,28 @@ auto newton_step(F &&f, Wrt &&initial, At &&at, Float tolerance) -> bool {
 
     nld::utils::vector_to_tuple(result, initial);
     auto n = norm(f, at);
+    return n < tolerance;
+}
+
+template <typename F, typename At, typename Float>
+auto newton_step(F &&f, At &at, Float tolerance) -> bool {
+    using Result = decltype(std::apply(f, nld::at(at)));
+
+    Result value;
+    auto jacobian = detail::jacobian(f, at, value);
+
+    Eigen::VectorXd result = at.template cast<double>();
+
+    if constexpr (FunctionWithPreviousStepSolution<F>)
+        f.set_previous_solution(result);
+
+    // Make single step of Newton method
+
+    result.head(value.size()) -=
+        detail::solve(jacobian, value.template cast<Float>());
+
+    at = result;
+    auto n = norm(f, nld::at(at));
     return n < tolerance;
 }
 

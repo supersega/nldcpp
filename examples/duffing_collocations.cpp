@@ -65,43 +65,47 @@ auto initial_guess(nld::collocations::mesh_parameters parameters,
 }
 
 int main() {
-    continuation_parameters params(newton_parameters(25, 0.00001), 45.1, 0.001,
-                                   0.01, direction::reverse);
-
-    nld::collocations::mesh_parameters mesh_params{30, 3};
-    auto basis_builder = nld::collocations::make_basis_builder<
-        nld::collocations::lagrange_basis>();
-    auto bc = [](const auto &u0, const auto &u1) { return u0 - u1; };
-
-    nld::collocations::boundary_value_problem system(duffing, bc, basis_builder,
-                                                     mesh_params, 2);
-
-    auto u0 = initial_guess(mesh_params, 2);
-    nld::vector_xdd v0 = nld::vector_xdd::Zero(u0.size());
-    v0(v0.size() - 1) = 1.0;
-
-    std::vector<double> A1;
-    std::vector<double> Omega;
-    for (auto v : arc_length(system, params, u0, v0, solution())) {
-        nld::vector_xd u_0((v.size() - 1) / 2);
-        for (std::size_t i = 0; i < u_0.size(); ++i) {
-            u_0[i] = (double)v[i * 2];
-        }
-
-        auto max = u_0.maxCoeff();
-        auto min = u_0.minCoeff();
-        auto A1_ = (max - min) / 2.0;
-
-        auto ut = v.head(v.size() - 1);
-        auto omega = 2.0 * PI / (double)v(v.size() - 1);
-        Omega.push_back((double)omega);
-        A1.push_back((double)A1_);
-        std::cout << "A1 = " << v(0) << ", omega = " << omega << std::endl;
-    }
-
-    plt::ylabel(R"($A_1$)");
-    plt::xlabel(R"($\Omega$)");
-    plt::named_plot("Duffing without explicit frequence/period argument", Omega,
-                    A1, "-b");
-    plt::show();
+    //     continuation_parameters params(newton_parameters(25, 0.00001), 45.1,
+    //     0.001,
+    //                                    0.01, direction::reverse);
+    //
+    //     nld::collocations::mesh_parameters mesh_params{30, 3};
+    //     auto basis_builder = nld::collocations::make_basis_builder<
+    //         nld::collocations::lagrange_basis>();
+    //     auto bc = [](const auto &u0, const auto &u1) { return u0 - u1; };
+    //
+    //     nld::collocations::boundary_value_problem system(duffing, bc,
+    //     basis_builder,
+    //                                                      mesh_params, 2);
+    //
+    //     auto u0 = initial_guess(mesh_params, 2);
+    //     nld::vector_xdd v0 = nld::vector_xdd::Zero(u0.size());
+    //     v0(v0.size() - 1) = 1.0;
+    //
+    //     std::vector<double> A1;
+    //     std::vector<double> Omega;
+    //     for (auto v : arc_length(system, params, u0, v0, solution())) {
+    //         nld::vector_xd u_0((v.size() - 1) / 2);
+    //         for (std::size_t i = 0; i < u_0.size(); ++i) {
+    //             u_0[i] = (double)v[i * 2];
+    //         }
+    //
+    //         auto max = u_0.maxCoeff();
+    //         auto min = u_0.minCoeff();
+    //         auto A1_ = (max - min) / 2.0;
+    //
+    //         auto ut = v.head(v.size() - 1);
+    //         auto omega = 2.0 * PI / (double)v(v.size() - 1);
+    //         Omega.push_back((double)omega);
+    //         A1.push_back((double)A1_);
+    //         std::cout << "A1 = " << v(0) << ", omega = " << omega <<
+    //         std::endl;
+    //     }
+    //
+    //     plt::ylabel(R"($A_1$)");
+    //     plt::xlabel(R"($\Omega$)");
+    //     plt::named_plot("Duffing without explicit frequence/period argument",
+    //     Omega,
+    //                     A1, "-b");
+    //     plt::show();
 }

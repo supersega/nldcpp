@@ -58,22 +58,22 @@ struct arc_length_representation final {
     /// using custom Jacobian, by implementing it in 'function'.
     /// Custom nonlinear functions can use jacobian_mixin class
     /// to inject required jacobian function.
-    /// @param wrt Variables w.r.t. we evaluate jacobian.
     /// @param at Point where we evaluate jacobian.
     /// @param v Value of function if given point.
     /// @return Jacobi matrix.
-    template <typename Wrt, typename At, typename Result>
-    auto jacobian(Wrt &&wrt, At &&at, Result &v) const {
-        const auto dim = autodiff::forward::detail::count(wrt);
+    template <typename At, typename Result>
+    auto jacobian(At &at, Result &v) const {
+        const auto dim = at.size();
         v.resize(dim);
 
         auto value = v.head(dim - 1);
 
         nld::matrix_xd J(dim, dim);
-        J.topLeftCorner(dim - 1, dim) = function.jacobian(wrt, at, value);
+        J.topLeftCorner(dim - 1, dim) = function.jacobian(at, value);
 
         auto keller = [*this](auto &val) { return arc_length_equation(val); };
-        auto dkeller = autodiff::forward::gradient(keller, wrt, at, v(dim - 1));
+        auto dkeller = autodiff::forward::gradient(keller, nld::wrt(at),
+                                                   nld::at(at), v(dim - 1));
 
         J.bottomRows(1) = dkeller.transpose();
 
@@ -89,7 +89,7 @@ struct arc_length_representation final {
         using Result = decltype(std::apply(*this, at(variables)));
 
         Result result;
-        auto jac = this->jacobian(wrt(variables), at(variables), result);
+        auto jac = this->jacobian(variables, result);
 
         const auto dim = jac.rows();
 

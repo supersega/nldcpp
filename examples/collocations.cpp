@@ -153,7 +153,7 @@ auto interpolate(auto basis_builder, const nld::collocations::mesh &mesh,
 int main(int argc, char *argv[]) {
     std::cout << "Collocations!" << std::endl;
 
-    nld::collocations::mesh_parameters parameters{300, 4};
+    nld::collocations::mesh_parameters parameters{20, 3};
     nld::collocations::mesh mesh(
         parameters, nld::collocations::uniform_mesh_nodes,
         nld::collocations::legandre_collocation_points);
@@ -185,20 +185,18 @@ int main(int argc, char *argv[]) {
 
     auto now = std::chrono::high_resolution_clock::now();
 
-    if (auto info =
-            nld::math::newton(system, wrt(u0.head(u0.size() - 1)), at(u0), np);
-        info) {
+    if (auto info = nld::math::newton(system, u0, np); info) {
         std::cout << "Iterations done = " << info.number_of_done_iterations
                   << '\n';
         std::cout << "Great work: colobok u = " << u0.head(2) << '\n';
     }
 
     auto end = std::chrono::high_resolution_clock::now();
-    std::cout << "Time: "
+    std::cout << "Elapsed time: "
               << std::chrono::duration_cast<std::chrono::milliseconds>(end -
                                                                        now)
                      .count()
-              << "ms\n";
+              << " ms\n";
 
     {
         nld::vector_xdd u_ = u.head(u.size() - 1);

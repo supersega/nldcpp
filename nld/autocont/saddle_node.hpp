@@ -153,12 +153,12 @@ struct saddle_node final : nld::problem<Ds> {
     /// @param at eval Jacobian at point.
     /// @param v value of function.
     /// @return Jacobian of saddle-node bifurcation detection system.
-    template <typename Wrt, typename At, typename Result>
-    auto jacobian(Wrt &&wrt, At &&at, Result &v) const -> matrix_xd {
-        using Vector = decltype(std::apply(*this, at));
+    template <typename At, typename Result>
+    auto jacobian(At &at, Result &v) const -> matrix_xd {
+        using Vector = decltype(std::apply(*this, nld::at(at)));
 
-        auto &variables = std::get<0>(at);
-        v = std::apply(*this, at);
+        auto &variables = at;
+        v = std::apply(*this, nld::at(at));
         const auto dim = variables.size();
         const auto states = (dim - internal::parameters) / 2;
 
@@ -166,9 +166,11 @@ struct saddle_node final : nld::problem<Ds> {
 
         nld::matrix_xd J = nld::matrix_xd::Zero(dim - 1, dim);
 
-        auto dyTdy0 = autodiff::forward::jacobian(solution_at_end, wrt, at);
+        auto dyTdy0 = autodiff::forward::jacobian(solution_at_end, nld::wrt(at),
+                                                  nld::at(at));
 
-        auto Hs = internal::hessians(solution_at_end, wrt, at);
+        auto Hs =
+            internal::hessians(solution_at_end, nld::wrt(at), nld::at(at));
         vector_xd phi =
             variables.segment(states, states).template cast<double>();
         std::array dimensions = {Eigen::IndexPair(1, 0)};

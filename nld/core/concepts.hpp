@@ -118,6 +118,16 @@ concept Jacobian = requires(F f, Wrt wrt, At at, R &r) {
     { f.jacobian(wrt, at, r) } -> Matrix;
 };
 
+/// @brief Function which provides Jacobian method.
+/// @details Concept of function supports Jacobian evaluation.
+/// Jacobian computed in Neton method, if function provides
+/// method bellow, it will be used for computations
+/// otherwise jacobian from autodiff will be used.
+template <typename F, typename At, typename R>
+concept JacobianFull = requires(F f, At &at, R &r) {
+    { f.jacobian(at, r) } -> Matrix;
+};
+
 /// @brief Function which provides Norm method
 template <typename F, typename At>
 concept Norm = requires(F f, At at) {

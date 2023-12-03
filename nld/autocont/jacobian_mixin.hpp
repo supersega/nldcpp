@@ -16,7 +16,6 @@ namespace nld {
 /// @brief Class to inject jacobian functions for nonlinear functions using
 /// operator().
 /// @details We use boundary_value_problem in this class, and it can use any
-/// integration method. But we use Runge-Kutta 4th order now.
 /// @tparam F Function.
 /// @tparam P Evaluation parameters.
 template <typename F>
@@ -29,6 +28,19 @@ struct jacobian_mixin : nld::utils::crtp<F> {
     template <typename Wrt, typename At, typename Result>
     auto jacobian(Wrt &&wrt, At &&at, Result &v) const {
         return autodiff::forward::jacobian(this->derived(), wrt, at, v);
+    }
+
+    /// @brief Jacobian of dynamic system.
+    /// @details This function is used by continuation methods.
+    /// This function give a guarantee that at and wrt are the same. So we can
+    /// perform some optimizations.
+    /// @param at Point where we evaluate jacobian.
+    /// @param v Value of function if given point.
+    /// @return Jacobi matrix.
+    template <typename At, typename Result>
+    auto jacobian(At &at, Result &v) const {
+        return autodiff::forward::jacobian(this->derived(), nld::wrt(at),
+                                           nld::wrt(at), v);
     }
 };
 } // namespace nld

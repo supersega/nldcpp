@@ -54,22 +54,21 @@ struct boundary_value_problem final {
               nld::collocations::legandre_collocation_points)) {}
 
     /// @brief Evaluate the jacobian of the boundary value problem
-    /// @tparam Wrt Type of the variables to differentiate with respect to
     /// @tparam At Type of the variables to evaluate at
     /// @tparam V Type of the result of the function
-    /// @param wrt Variables to differentiate with respect to
     /// @param at Variables to evaluate at
     /// @param v Value of the function
-    template <typename Wrt, typename At, typename V>
-    auto jacobian(Wrt &&wrt, At &&at, V &&v) const -> nld::sparse_matrix_xd {
+    template <typename At, typename V>
+    auto jacobian(At &at, V &v) const -> nld::sparse_matrix_xd {
         auto m = parameters.collocation_points;
         auto n = dimension;
 
-        auto jac = autodiff::forward::jacobian(*this, wrt, at, v);
-        nld::sparse_matrix_xd result(jac.rows(), jac.cols());
+        auto jac =
+            autodiff::forward::jacobian(*this, nld::wrt(at), nld::at(at), v);
+        nld::sparse_matrix_xd result(jac.rows(), jac.rows());
         result.reserve(VectorXi::Constant(jac.cols(), 3 * m * n));
 
-        for (std::size_t i = 0; i < jac.cols(); ++i) {
+        for (std::size_t i = 0; i < jac.rows(); ++i) {
             for (std::size_t j = 0; j < jac.rows(); ++j) {
                 if (jac(j, i) != 0.0) {
                     result.insert(j, i) = jac(j, i);

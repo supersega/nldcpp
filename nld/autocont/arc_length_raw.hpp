@@ -20,22 +20,28 @@ namespace nld::internal {
 /// @param tangential Initial guess vector which has structure (u, lambda)
 /// @param map Function to map solution f: (V, R) -> MappedType.
 /// @return Generator which yields solution on iteration.
-template<typename F, Vector V, Vector T, typename M>
-auto arc_length_raw(F&& function, nld::continuation_parameters parameters, V unknowns, T tangential, M map) noexcept -> cppcoro::generator<decltype(map(std::declval<F>(), std::declval<V>()))> {
+template <typename F, Vector V, Vector T, typename M>
+auto arc_length_raw(F &&function, nld::continuation_parameters parameters,
+                    V unknowns, T tangential, M map) noexcept
+    -> cppcoro::generator<decltype(map(std::declval<F>(), std::declval<V>()))> {
     auto [newton_parameters, tail, min_step, max_step, dir] = parameters;
 
     tangential *= static_cast<double>(dir);
-    nld::step_updater updater(nld::step_updater_parameters{ min_step, max_step, 1.67, 4 });
-    nld::arc_length_representation problem(std::forward<F>(function), unknowns, tangential, updater.step());
+    nld::step_updater updater(
+        nld::step_updater_parameters{min_step, max_step, 1.67, 4});
+    nld::arc_length_representation problem(std::forward<F>(function), unknowns,
+                                           tangential, updater.step());
 
     V old_unknowns;
     T old_tangential;
 
     while ((tail -= updater.step()) > 0) {
         // Correct solution
-        if (auto info = nld::newton(problem, wrt(unknowns), at(unknowns), newton_parameters); info) {
+        if (auto info = nld::newton(problem, unknowns, newton_parameters);
+            info) {
             tangential = problem.tangential(unknowns);
-            problem.set_arc_length_properties(unknowns, tangential, updater.step());
+            problem.set_arc_length_properties(unknowns, tangential,
+                                              updater.step());
 
             co_yield map(problem.underlying_function(), unknowns);
 
@@ -46,18 +52,19 @@ auto arc_length_raw(F&& function, nld::continuation_parameters parameters, V unk
             // Predicate solution for next step
             unknowns += updater.step() * tangential;
 
-            // We was able to calculate this point, so let us try to make continuation step bigger.
+            // We was able to calculate this point, so let us try to make
+            // continuation step bigger.
             updater.increase_step_if_possible();
-        }
-        else {
+        } else {
             // Minimal step reached, we have to stop continuation.
             if (!updater.decrease_step())
                 break;
 
-            // Fallback to previous point with smaller continuation step.    
-            problem.set_arc_length_properties(old_unknowns, old_tangential, updater.step());
+            // Fallback to previous point with smaller continuation step.
+            problem.set_arc_length_properties(old_unknowns, old_tangential,
+                                              updater.step());
             unknowns = old_unknowns;
         }
     }
 }
-}
+} // namespace nld::internal
