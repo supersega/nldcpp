@@ -153,7 +153,7 @@ auto interpolate(auto basis_builder, const nld::collocations::mesh &mesh,
 int main(int argc, char *argv[]) {
     std::cout << "Collocations!" << std::endl;
 
-    nld::collocations::mesh_parameters parameters{20, 3};
+    nld::collocations::mesh_parameters parameters{90, 3};
     nld::collocations::mesh mesh(
         parameters, nld::collocations::uniform_mesh_nodes,
         nld::collocations::legandre_collocation_points);
@@ -185,7 +185,18 @@ int main(int argc, char *argv[]) {
 
     auto now = std::chrono::high_resolution_clock::now();
 
-    if (auto info = nld::math::newton(system, u0, np); info) {
+    nld::vector_xdd V;
+    // auto J = system.jacobian(u0, V);
+
+    // std::cout << "Jacobian = \n" << nld::matrix_xd(J) << std::endl;
+
+    // auto J_autodiff = system.jacobian(nld::wrt(u0), nld::at(u0), V);
+
+    // std::cout << "Jacobian autodiff = \n" << J_autodiff << std::endl;
+
+    auto wrt = u0.head(u0.size() - 1);
+    if (auto info = nld::math::newton(system, nld::wrt(wrt), nld::at(u0), np);
+        info) {
         std::cout << "Iterations done = " << info.number_of_done_iterations
                   << '\n';
         std::cout << "Great work: colobok u = " << u0.head(2) << '\n';

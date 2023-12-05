@@ -53,29 +53,182 @@ struct boundary_value_problem final {
               parameters, nld::collocations::uniform_mesh_nodes,
               nld::collocations::legandre_collocation_points)) {}
 
+    /// @frief just for testing
+    template <typename Wrt, typename At, typename V>
+    auto jacobian(Wrt &&wrt, At &&at, V &v) const -> nld::sparse_matrix_xd {
+        auto u0 = std::get<0>(at);
+        auto J_full = jacobian(u0, v);
+        nld::sparse_matrix_xd J =
+            J_full.block(0, 0, J_full.rows(), J_full.cols() - 1);
+
+        return J;
+    }
+
     /// @brief Evaluate the jacobian of the boundary value problem
+    /// @details The jacobian of the boundary value problem is the sparse
+    /// * * * * 0 0 0 0 *
+    /// * * * * 0 0 0 0 *
+    /// * * * * * * * * 0
+    /// 0 0 0 0 * * * * *
+    /// 0 0 0 0 * * * * *
+    /// * 0 0 0 0 0 0 * 0
     /// @tparam At Type of the variables to evaluate at
     /// @tparam V Type of the result of the function
     /// @param at Variables to evaluate at
     /// @param v Value of the function
     template <typename At, typename V>
-    auto jacobian(At &at, V &v) const -> nld::sparse_matrix_xd {
+    auto jacobian(At &u, V &v) const -> nld::sparse_matrix_xd {
+        collocation_on_elements evaluator(grid, basis_builder);
+
+        auto N = parameters.intervals;
         auto m = parameters.collocation_points;
-        auto n = dimension;
+        std::size_t n = dimension;
 
-        auto jac =
-            autodiff::forward::jacobian(*this, nld::wrt(at), nld::at(at), v);
-        nld::sparse_matrix_xd result(jac.rows(), jac.rows());
-        result.reserve(VectorXi::Constant(jac.cols(), 3 * m * n));
+        auto size = N * n * m + (N - 1) * n + n;
+        auto parameters_size = u.size() - size;
 
-        for (std::size_t i = 0; i < jac.rows(); ++i) {
-            for (std::size_t j = 0; j < jac.rows(); ++j) {
-                if (jac(j, i) != 0.0) {
-                    result.insert(j, i) = jac(j, i);
+        // TODO: here should be parameters taken into account
+        nld::sparse_matrix_xd result(size, size + parameters_size);
+        Eigen::VectorXi size_estimation(size + parameters_size);
+        size_estimation << VectorXi::Constant(size, 3 * m * n),
+            VectorXi::Constant(parameters_size, size);
+        result.reserve(size_estimation);
+
+        nld::vector_xdd f(size);
+        f = nld::vector_xdd::Zero(size);
+
+        // TODO: add support for multiple parameters
+        auto parameters = u.tail(parameters_size);
+
+        for (std::size_t j = 0; j < N; ++j) {
+            auto values = evaluator.values_in_collocation_points(j);
+            auto derivatives = evaluator.derivatives_in_collocation_points(j);
+
+            // unknowns on element j
+            auto u_j = u.segment(j * (m + 1) * n, (m + 1) * n);
+            for (std::size_t k = 0; k < m; ++k) {
+                auto t = grid.collocation_points[j * m + k];
+
+                auto collocation_equations =
+                    [this, &values, &derivatives, n, m,
+                     k](const auto &u_j, auto t,
+                        const auto &parameters) -> nld::vector_xdd {
+                    // Build polynomial and its derivative
+                    nld::vector_xdd p = nld::vector_xdd::Zero(n);
+                    nld::vector_xdd p_prime = nld::vector_xdd::Zero(n);
+                    for (std::size_t l = 0; l < m + 1; ++l) {
+                        for (std::size_t i = 0; i < n; ++i) {
+                            auto q = u_j[l * n + i];
+                            p[i] += values(l, k) * q;
+                            p_prime[i] += derivatives(l, k) * q;
+                        }
+                    }
+
+                    auto f_p = function(p, t, parameters);
+                    return p_prime - f_p;
+                };
+
+                nld::vector_xdd value;
+                auto J = autodiff::forward::jacobian(
+                    collocation_equations, nld::wrt(u_j, parameters),
+                    nld::at(u_j, t, parameters), value);
+
+                auto shift = j * (m + 1) * n + k * n;
+                for (std::size_t l = 0; l < m + 1; ++l) {
+                    for (std::size_t c = 0; c < n; ++c) {
+                        for (std::size_t i = 0; i < n; ++i) {
+                            auto rl = i;
+                            auto cl = l * n + c;
+                            auto rg = j * (m + 1) * n + k * n + rl;
+                            auto cg = j * (m + 1) * n + cl;
+                            result.insert(rg, cg) = J(rl, cl);
+                        }
+                    }
+                }
+
+                for (std::size_t c = 0; c < parameters_size; ++c) {
+                    for (std::size_t i = 0; i < n; ++i) {
+                        auto rl = i;
+                        auto cl = (m + 1) * n + c;
+                        auto rg = j * (m + 1) * n + k * n + rl;
+                        auto cg = size + c;
+                        result.insert(rg, cg) = J(rl, cl);
+                    }
+                }
+
+                f.segment(j * (m + 1) * n + k * n, n) = value;
+            }
+
+            if (j < N - 1) {
+                auto values_in_mesh_node = evaluator.values_in_mesh_node(j + 1);
+
+                auto continuity_equations =
+                    [this, &values_in_mesh_node, n, m,
+                     j](const auto &u_jl, const auto &u_jr) -> nld::vector_xdd {
+                    nld::vector_xdd continuity = nld::vector_xdd::Zero(n);
+                    for (std::size_t l = 0; l < m + 1; ++l) {
+                        for (std::size_t i = 0; i < n; ++i) {
+                            auto ql = u_jl[l * n + i];
+                            auto qr = u_jr[l * n + i];
+                            continuity[i] += values_in_mesh_node(l, 0) * ql -
+                                             values_in_mesh_node(l, 1) * qr;
+                        }
+                    }
+                    return continuity;
+                };
+
+                auto u_jl = u.segment(j * (m + 1) * n, (m + 1) * n);
+                auto u_jr = u.segment((j + 1) * (m + 1) * n, (m + 1) * n);
+
+                nld::vector_xdd value;
+                auto J = autodiff::forward::jacobian(
+                    continuity_equations, nld::wrt(u_jl, u_jr),
+                    nld::at(u_jl, u_jr), value);
+
+                auto shift = j * (m + 1) * n + m * n;
+                for (std::size_t l = 0; l < 2 * (m + 1); ++l) {
+                    for (std::size_t c = 0; c < n; ++c) {
+                        for (std::size_t i = 0; i < n; ++i) {
+                            auto rl = i;
+                            auto cl = l * n + c;
+                            auto rg = j * (m + 1) * n + m * n + rl;
+                            auto cg = j * (m + 1) * n + cl;
+                            result.insert(rg, cg) = J(rl, cl);
+                        }
+                    }
+                }
+
+                f.segment(j * (m + 1) * n + m * n, n) = value;
+            }
+        }
+
+        auto boundary_conditions_equations =
+            [this, n](const auto &u0, const auto &uN) -> nld::vector_xdd {
+            return boundary_conditions(u0, uN);
+        };
+
+        auto u0 = u.head(n);
+        auto uN = u.segment(N * m * n + (N - 1) * n, n);
+        nld::vector_xdd value;
+        auto J = autodiff::forward::jacobian(boundary_conditions_equations,
+                                             nld::wrt(u0, uN), nld::at(u0, uN),
+                                             value);
+
+        for (std::size_t l = 0; l < 2; ++l) {
+            for (std::size_t c = 0; c < n; ++c) {
+                for (std::size_t i = 0; i < n; ++i) {
+                    auto rl = i;
+                    auto cl = l * n + c;
+                    auto rg = N * m * n + (N - 1) * n + rl;
+                    auto cg = N * m * n * l + (N - 1) * n * l + c;
+                    result.insert(rg, cg) = J(rl, cl);
                 }
             }
         }
 
+        f.segment(N * m * n + (N - 1) * n, n) = value;
+
+        v = f;
         return result;
     }
 
