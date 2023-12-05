@@ -1,10 +1,32 @@
 #pragma once
 
+#include "nld/core/aliases.hpp"
 #include <nld/core.hpp>
+#include <nld/math.hpp>
 
 #include <nld/autocont/jacobian_mixin.hpp>
 
+#include <iostream>
+
 namespace nld {
+namespace detail {
+
+inline auto build_matrix(nld::matrix_xd &J, const nld::vector_xd &v) -> void {
+    auto dim = v.size();
+    J.conservativeResize(dim, dim);
+    J.bottomRows(1) = v.transpose();
+}
+
+inline auto build_matrix(nld::sparse_matrix_xd &J, const nld::vector_xd &v)
+    -> void {
+    auto dim = v.size();
+
+    J.conservativeResize(dim, dim);
+    for (int i = 0; i < v.size(); ++i)
+        J.insert(dim - 1, i) = v(i);
+}
+} // namespace detail
+
 /// @brief Class which represent function as nonlinear function with arc length
 /// parametrization.
 /// @details This class can be used for pseudo arc length continuation
@@ -63,21 +85,21 @@ struct arc_length_representation final {
     /// @return Jacobi matrix.
     template <typename At, typename Result>
     auto jacobian(At &at, Result &v) const {
+        using Matrix = decltype(function.jacobian(at, v));
+
         const auto dim = at.size();
         v.resize(dim);
 
         auto value = v.head(dim - 1);
 
-        nld::matrix_xd J(dim, dim);
-        J.topLeftCorner(dim - 1, dim) = function.jacobian(at, value);
-
         auto keller = [*this](auto &val) { return arc_length_equation(val); };
         auto dkeller = autodiff::forward::gradient(keller, nld::wrt(at),
                                                    nld::at(at), v(dim - 1));
 
-        J.bottomRows(1) = dkeller.transpose();
+        auto top_left = function.jacobian(at, value);
+        detail::build_matrix(top_left, dkeller);
 
-        return J;
+        return top_left;
     }
 
     /// @brief Tangential to bifurcation curve at given point.
@@ -99,8 +121,7 @@ struct arc_length_representation final {
         // Solve system to compute tangent
         // (df/dy df/dlambda)   = (0)
         // (dy0/ds dlambda0/ds) = (1)
-        Vec tan = jac.fullPivHouseholderQr().solve(right);
-
+        Vec tan = nld::math::linear_algebra::solve(jac, right);
         tan.normalize();
 
         return tan;

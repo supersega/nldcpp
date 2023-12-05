@@ -59,7 +59,7 @@ struct boundary_value_problem final {
         auto u0 = std::get<0>(at);
         auto J_full = jacobian(u0, v);
         nld::sparse_matrix_xd J =
-            J_full.block(0, 0, J_full.rows(), J_full.cols() - 1);
+            J_full.block(0, 0, J_full.rows() - 1, J_full.cols() - 1);
 
         return J;
     }
@@ -87,9 +87,13 @@ struct boundary_value_problem final {
         auto size = N * n * m + (N - 1) * n + n;
         auto parameters_size = u.size() - size;
 
-        // TODO: here should be parameters taken into account
-        nld::sparse_matrix_xd result(size, size + parameters_size);
+        // Create square sparce Jacobian to avoid reallocation
+        // on client side
+        nld::sparse_matrix_xd result(size + parameters_size,
+                                     size + parameters_size);
         Eigen::VectorXi size_estimation(size + parameters_size);
+        // TODO: we know exact how many non-zero elements we have
+        // so we can avoid reallocation/overestimation
         size_estimation << VectorXi::Constant(size, 3 * m * n),
             VectorXi::Constant(parameters_size, size);
         result.reserve(size_estimation);
@@ -97,7 +101,6 @@ struct boundary_value_problem final {
         nld::vector_xdd f(size);
         f = nld::vector_xdd::Zero(size);
 
-        // TODO: add support for multiple parameters
         auto parameters = u.tail(parameters_size);
 
         for (std::size_t j = 0; j < N; ++j) {
@@ -109,6 +112,9 @@ struct boundary_value_problem final {
             for (std::size_t k = 0; k < m; ++k) {
                 auto t = grid.collocation_points[j * m + k];
 
+                // Next collocation equations: p'(t) - f(p(t), t, p) = 0
+                // We sutisfy this equation on each finite element at
+                // m collocation points
                 auto collocation_equations =
                     [this, &values, &derivatives, n, m,
                      k](const auto &u_j, auto t,
@@ -133,6 +139,7 @@ struct boundary_value_problem final {
                     collocation_equations, nld::wrt(u_j, parameters),
                     nld::at(u_j, t, parameters), value);
 
+                // Fill Jacobian w.r.t. u_j
                 auto shift = j * (m + 1) * n + k * n;
                 for (std::size_t l = 0; l < m + 1; ++l) {
                     for (std::size_t c = 0; c < n; ++c) {
@@ -146,6 +153,7 @@ struct boundary_value_problem final {
                     }
                 }
 
+                // Fill Jacobian w.r.t. parameters
                 for (std::size_t c = 0; c < parameters_size; ++c) {
                     for (std::size_t i = 0; i < n; ++i) {
                         auto rl = i;
@@ -156,12 +164,17 @@ struct boundary_value_problem final {
                     }
                 }
 
+                // Values of colloaction equations
                 f.segment(j * (m + 1) * n + k * n, n) = value;
             }
 
             if (j < N - 1) {
                 auto values_in_mesh_node = evaluator.values_in_mesh_node(j + 1);
 
+                // Continuity equations: Pm[j - 1](u_j) - Pm[j](u_j) = 0
+                // On each finite element we have polynomial of degree m
+                // Solution should be continuous on the mesh nodes, so we
+                // add continuity equations to satisfy this condition
                 auto continuity_equations =
                     [this, &values_in_mesh_node, n, m,
                      j](const auto &u_jl, const auto &u_jr) -> nld::vector_xdd {
@@ -185,6 +198,7 @@ struct boundary_value_problem final {
                     continuity_equations, nld::wrt(u_jl, u_jr),
                     nld::at(u_jl, u_jr), value);
 
+                // Fill Jacobian w.r.t. u_jl for continuity equations
                 auto shift = j * (m + 1) * n + m * n;
                 for (std::size_t l = 0; l < 2 * (m + 1); ++l) {
                     for (std::size_t c = 0; c < n; ++c) {
@@ -198,10 +212,17 @@ struct boundary_value_problem final {
                     }
                 }
 
+                // Fill values of continuity equations, since we have
+                // continuous solution on the mesh nodes, values should be 0
+                // but we write them strictly now
                 f.segment(j * (m + 1) * n + m * n, n) = value;
             }
         }
 
+        // Boundary conditions equations: b(u0, uN) = 0
+        // For periodic boundary conditions we have b(u0, uN) = u0 - uN = 0
+        // this leads to two identity matrices in Jacobian, so point for
+        // optimization
         auto boundary_conditions_equations =
             [this, n](const auto &u0, const auto &uN) -> nld::vector_xdd {
             return boundary_conditions(u0, uN);
@@ -214,6 +235,7 @@ struct boundary_value_problem final {
                                              nld::wrt(u0, uN), nld::at(u0, uN),
                                              value);
 
+        // Fill Jacobian w.r.t. u0, uN for boundary conditions equations
         for (std::size_t l = 0; l < 2; ++l) {
             for (std::size_t c = 0; c < n; ++c) {
                 for (std::size_t i = 0; i < n; ++i) {
@@ -226,6 +248,8 @@ struct boundary_value_problem final {
             }
         }
 
+        // Fill values of boundary conditions equations
+        // Again, should be zero, but we write them strictly now
         f.segment(N * m * n + (N - 1) * n, n) = value;
 
         v = f;

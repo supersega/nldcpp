@@ -65,10 +65,10 @@ auto initial_guess(nld::collocations::mesh_parameters parameters,
 }
 
 int main() {
-    continuation_parameters params(newton_parameters(25, 0.00001), 45.1, 0.001,
+    continuation_parameters params(newton_parameters(25, 0.00001), 55.1, 0.001,
                                    0.01, direction::reverse);
 
-    nld::collocations::mesh_parameters mesh_params{30, 3};
+    nld::collocations::mesh_parameters mesh_params{90, 3};
     auto basis_builder = nld::collocations::make_basis_builder<
         nld::collocations::lagrange_basis>();
     auto bc = [](const auto &u0, const auto &u1) { return u0 - u1; };
