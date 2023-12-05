@@ -4,6 +4,7 @@
 #include <nld/core.hpp>
 
 #include <iostream>
+#include <nld/math/linear_algebra.hpp>
 #include <nld/math/newton_parameters.hpp>
 
 namespace nld::math {
@@ -118,23 +119,6 @@ auto jacobian(Function &f, At &at, Result &F) {
         return autodiff::forward::jacobian(f, nld::wrt(at), nld::at(at), F);
 }
 
-// Solve linear system using QR decomposition for dense matrix.
-inline auto solve(const nld::matrix_xd &A, const nld::vector_xd &b)
-    -> nld::vector_xd {
-    return A.fullPivHouseholderQr().solve(b);
-}
-
-// Solve linear system using QR decomposition for sparse matrix.
-inline auto solve(nld::sparse_matrix_xd &A, const nld::vector_xd &b)
-    -> nld::vector_xd {
-    Eigen::SparseLU<nld::sparse_matrix_xd, Eigen::COLAMDOrdering<int>> solver;
-
-    solver.analyzePattern(A);
-    solver.factorize(A);
-
-    return solver.solve(b);
-}
-
 /// TODO: Avoid copy of vector (using xpr?) and optimize if `wrt` size == 1.
 /// Make enable to use scalar functions.
 template <typename F, typename Wrt, typename At, typename Float>
@@ -152,7 +136,8 @@ auto newton_step(F &&f, Wrt &&initial, At &&at, Float tolerance) -> bool {
 
     // Make single step of Newton method
 
-    result -= detail::solve(jacobian, value.template cast<Float>());
+    result -= nld::math::linear_algebra::solve(jacobian,
+                                               value.template cast<Float>());
 
     nld::utils::vector_to_tuple(result, initial);
     auto n = norm(f, at);
@@ -173,8 +158,8 @@ auto newton_step(F &&f, At &at, Float tolerance) -> bool {
 
     // Make single step of Newton method
 
-    result.head(value.size()) -=
-        detail::solve(jacobian, value.template cast<Float>());
+    result.head(value.size()) -= nld::math::linear_algebra::solve(
+        jacobian, value.template cast<Float>());
 
     at = result;
     auto n = norm(f, nld::at(at));
