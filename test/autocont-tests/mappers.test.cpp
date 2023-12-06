@@ -1,4 +1,3 @@
-#include "nld/autocont/periodic_parameters.hpp"
 #include <catch.hpp>
 
 #include <cmath>

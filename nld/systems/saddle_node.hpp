@@ -1,9 +1,9 @@
 #pragma once
 
 #include <array>
-#include <nld/autocont/periodic_parameters.hpp>
-#include <nld/autocont/problem.hpp>
 #include <nld/core.hpp>
+#include <nld/systems/periodic_parameters.hpp>
+#include <nld/systems/problem.hpp>
 
 namespace nld {
 namespace internal {

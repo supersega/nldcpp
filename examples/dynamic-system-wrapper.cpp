@@ -1,5 +1,4 @@
 // C++ includes
-#include "nld/autocont/periodic_parameters.hpp"
 constexpr auto PI = 3.14159265358979323846264338327950288;
 #include <fstream>
 #include <iostream>

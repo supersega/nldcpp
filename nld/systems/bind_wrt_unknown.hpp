@@ -1,6 +1,6 @@
 #pragma once
 
-#include <nld/autocont/jacobian_mixin.hpp>
+#include <nld/systems/jacobian_mixin.hpp>
 
 #include <utility>
 namespace nld {

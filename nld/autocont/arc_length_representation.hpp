@@ -1,10 +1,7 @@
 #pragma once
 
-#include "nld/core/aliases.hpp"
 #include <nld/core.hpp>
 #include <nld/math.hpp>
-
-#include <nld/autocont/jacobian_mixin.hpp>
 
 #include <iostream>
 

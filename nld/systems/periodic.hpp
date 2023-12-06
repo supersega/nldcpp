@@ -3,12 +3,12 @@
 #include <nld/core.hpp>
 #include <nld/math.hpp>
 
-#include <nld/autocont/integration_arguments.hpp>
-#include <nld/autocont/jacobian_mixin.hpp>
-#include <nld/autocont/periodic_base.hpp>
-#include <nld/autocont/periodic_parameters.hpp>
-#include <nld/autocont/problem.hpp>
-#include <nld/autocont/systems.hpp>
+#include <nld/systems/integration_arguments.hpp>
+#include <nld/systems/jacobian_mixin.hpp>
+#include <nld/systems/ode.hpp>
+#include <nld/systems/periodic_base.hpp>
+#include <nld/systems/periodic_parameters.hpp>
+#include <nld/systems/problem.hpp>
 
 namespace nld {
 namespace internal {

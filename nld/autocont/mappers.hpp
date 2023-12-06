@@ -2,7 +2,7 @@
 
 #include <nld/math.hpp>
 
-#include <nld/autocont/periodic.hpp>
+#include <nld/systems/periodic.hpp>
 
 namespace nld {
 
