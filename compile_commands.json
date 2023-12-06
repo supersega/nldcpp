@@ -1,7 +1,0 @@
-[
-  {
-    "directory": "/Volumes/Data/dev/nldcpp/examples",
-    "command": "clang++.exe -x c++ periodic.cpp -std=c++20 -DMYFLAG1 -DMYFLAG2 -Iinclude -I../../nldcpp -I/Volumes/Data/dev/vcpkg/installed/x64-osx/include/eigen3 -I/Volumes/Data/dev/vcpkg/installed/x64-osx/include",
-    "file": "periodic.cpp"
-  }
-]
