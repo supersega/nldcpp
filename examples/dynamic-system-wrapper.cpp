@@ -2,20 +2,18 @@
 constexpr auto PI = 3.14159265358979323846264338327950288;
 #include <fstream>
 #include <iostream>
-#include <vector>
-using namespace std;
-
 #include <nld/autocont.hpp>
-using namespace nld;
+#include <vector>
 
 #include <matplotlibcpp.h>
 namespace plt = matplotlibcpp;
 // Duffing oscilator with energy dissipation
-vector_xdd duffing(const vector_xdd &y, dual t, dual Omega) {
-    vector_xdd dy(y.size());
+nld::vector_xdd duffing(const nld::vector_xdd &y, nld::dual t,
+                        nld::dual Omega) {
+    nld::vector_xdd dy(y.size());
 
-    dual t5 = pow(y[0], 0.2e1);
-    dual t8 = cos(t);
+    nld::dual t5 = pow(y[0], 0.2e1);
+    nld::dual t8 = cos(t);
 
     dy[0] = y[1] / Omega;
     dy[1] = -0.1e-1 * y[1] - 0.1000000000e1 * y[0] -
@@ -24,19 +22,20 @@ vector_xdd duffing(const vector_xdd &y, dual t, dual Omega) {
     return dy;
 }
 
-vector_xdd ABC_reaction(const vector_xdd &u, dual T, dual D) {
-    vector_xdd du(u.size());
+nld::vector_xdd ABC_reaction(const nld::vector_xdd &u, nld::dual T,
+                             nld::dual D) {
+    nld::vector_xdd du(u.size());
 
     double alpha = 1;
     double sigma = 0.04;
     double B = 8;
     double betta = 1.55;
 
-    dual du_0 = -u(0) + D * (1 - u(0)) * exp(u(2));
-    dual du_1 =
+    nld::dual du_0 = -u(0) + D * (1 - u(0)) * exp(u(2));
+    nld::dual du_1 =
         -u(1) + D * (1 - u(0)) * exp(u(2)) + D * sigma * u(1) * exp(u(2));
-    dual du_2 = -u(2) * betta * u(2) + D * B * (1 - u(0)) * exp(u(2)) +
-                D * B * sigma * alpha * u(1) * exp(u(2));
+    nld::dual du_2 = -u(2) * betta * u(2) + D * B * (1 - u(0)) * exp(u(2)) +
+                     D * B * sigma * alpha * u(1) * exp(u(2));
 
     du(0) = du_0;
     du(1) = du_1;
@@ -47,8 +46,8 @@ vector_xdd ABC_reaction(const vector_xdd &u, dual T, dual D) {
     return du;
 }
 
-vector_xdd ABC_reaction_0(const vector_xdd &u, dual D) {
-    vector_xdd du(u.size());
+nld::vector_xdd ABC_reaction_0(const nld::vector_xdd &u, nld::dual D) {
+    nld::vector_xdd du(u.size());
 
     double alpha = 1;
     double sigma = 0.04;
@@ -63,8 +62,8 @@ vector_xdd ABC_reaction_0(const vector_xdd &u, dual D) {
     return du;
 }
 
-vector_xdd f(const vector_xdd &u, dual T, dual alpha) {
-    vector_xdd f(u.size());
+nld::vector_xdd f(const nld::vector_xdd &u, nld::dual T, nld::dual alpha) {
+    nld::vector_xdd f(u.size());
 
     f[0] = -2.0 * u[0] + u[1] + alpha * exp(u[0]);
     f[1] = u[0] - 2.0 * u[1] + alpha * exp(u[1]);
@@ -72,8 +71,8 @@ vector_xdd f(const vector_xdd &u, dual T, dual alpha) {
     return f;
 }
 
-auto simple_system(const vector_xdd &u, dual T, dual lambda) {
-    vector_xdd f(u.size());
+auto simple_system(const nld::vector_xdd &u, nld::dual T, nld::dual lambda) {
+    nld::vector_xdd f(u.size());
 
     f[0] = (1.0 - lambda) * u[0] - u[1];
     f[1] = u[0] + u[0] * u[0];
@@ -83,8 +82,8 @@ auto simple_system(const vector_xdd &u, dual T, dual lambda) {
     return f;
 }
 
-auto simple_system_2(const vector_xdd &u, dual lambda) {
-    vector_xdd f(2);
+auto simple_system_2(const nld::vector_xdd &u, nld::dual lambda) {
+    nld::vector_xdd f(2);
 
     f[0] = (1.0 - lambda) * u[0] - u[1];
     f[1] = u[0] + u[0] * u[0];
@@ -92,8 +91,8 @@ auto simple_system_2(const vector_xdd &u, dual lambda) {
     return f;
 }
 
-auto simple_system_3(const vector_xdd &u, dual lambda) {
-    vector_xdd f(2);
+auto simple_system_3(const nld::vector_xdd &u, nld::dual lambda) {
+    nld::vector_xdd f(2);
 
     f[0] = (lambda)*u[0] - u[1];
     f[1] = u[0] - u[0] * u[0];
@@ -101,8 +100,8 @@ auto simple_system_3(const vector_xdd &u, dual lambda) {
     return f;
 }
 
-auto duffing_autonomous(const vector_xdd &y, dual omega) {
-    vector_xdd dy(4);
+auto duffing_autonomous(const nld::vector_xdd &y, nld::dual omega) {
+    nld::vector_xdd dy(4);
 
     double c = 0.01;
     double k = 1.0;
@@ -118,19 +117,17 @@ auto duffing_autonomous(const vector_xdd &y, dual omega) {
 }
 
 int main() {
-    ofstream fs("/Volumes/Data/dev/nonlinear-dynamic-phd/src/3rd-year-report/"
-                "data/stuff.csv");
-    fs << 'x' << ';' << 'y' << endl;
+    nld::continuation_parameters params(nld::newton_parameters(25, 0.000005),
+                                        2.1, 0.003, 0.003,
+                                        nld::direction::forward);
 
-    continuation_parameters params(newton_parameters(25, 0.000005), 2.1, 0.003,
-                                   0.003, direction::forward);
+    auto ip = nld::periodic_parameters_constant{1, 200};
+    auto bvp =
+        periodic<nld::runge_kutta_4>(nld::autonomous(simple_system_3), ip);
 
-    auto ip = periodic_parameters_constant{1, 200};
-    auto bvp = periodic<runge_kutta_4>(autonomous(simple_system_3), ip);
-
-    vector_xdd u0(2);
+    nld::vector_xdd u0(2);
     u0 << 0.0, 0.0;
-    dual lambda0 = 0.0;
+    nld::dual lambda0 = 0.0;
     auto jacobian_hopf =
         autodiff::forward::jacobian(simple_system_3, wrt(u0), at(u0, lambda0));
 
@@ -145,26 +142,27 @@ int main() {
     Eigen::VectorXd nc = v.real();
     Eigen::VectorXd ns = v.imag();
 
-    vector_xdd u(2);
-    dual T = 2.0 * PI;
-    dual lambda = 0.0;
+    nld::vector_xdd u(2);
+    nld::dual T = 2.0 * PI;
+    nld::dual lambda = 0.0;
     auto s = 0.002;
 
     u << 0.0, 0.0;
 
-    vector_xdd us(4);
+    nld::vector_xdd us(4);
     us << u, T, lambda;
 
-    vector_xdd vs(4);
+    nld::vector_xdd vs(4);
     vs << -nc, 0.0, 0.0;
 
     std::vector<double> Am;
     std::vector<double> L;
-    vector_xdd v0;
-    dual lmbd = 0;
-    dual per = 0;
-    for (auto [v, A] : arc_length(bvp, params, us, vs,
-                                  concat(solution(), mean_amplitude(0)))) {
+    nld::vector_xdd v0;
+    nld::dual lmbd = 0;
+    nld::dual per = 0;
+    for (auto [v, A] :
+         arc_length(bvp, params, us, vs,
+                    concat(nld::solution(), nld::mean_amplitude(0)))) {
         v0 = v.head(2);
         lmbd = v[3];
         per = v[2];
@@ -175,9 +173,9 @@ int main() {
     std::cout << "T: " << per << std::endl;
     std::cout << "v0: " << v0 << std::endl;
 
-    auto sol = runge_kutta_4::solution(
+    auto sol = nld::runge_kutta_4::solution(
         [lmbd](const auto &y, auto t) { return simple_system_3(y, lmbd); },
-        constant_step_parameters{0.0, 3.0 * (double)per, 2000}, v0);
+        nld::constant_step_parameters{0.0, 3.0 * (double)per, 2000}, v0);
 
     std::vector<double> xt(sol.rows());
     std::vector<double> ts(sol.rows());

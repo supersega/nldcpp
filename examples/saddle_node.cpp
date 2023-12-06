@@ -6,13 +6,13 @@ constexpr auto PI = 3.14159265358979323846264338327950288;
 using namespace std;
 
 #include <nld/autocont.hpp>
-using namespace nld;
 
 #include <matplotlibcpp.h>
 namespace plt = matplotlibcpp;
 
-vector_xdd2 NLTVA(const vector_xdd2 &y, dual2 t, const vector_xdd2 &params) {
-    vector_xdd2 dy(4);
+nld::vector_xdd2 NLTVA(const nld::vector_xdd2 &y, nld::dual2 t,
+                       const nld::vector_xdd2 &params) {
+    nld::vector_xdd2 dy(4);
 
     auto epsilon = 0.05;
     auto m1 = 1.0;
@@ -51,25 +51,27 @@ vector_xdd2 NLTVA(const vector_xdd2 &y, dual2 t, const vector_xdd2 &params) {
 }
 
 int main() {
-    continuation_parameters params(newton_parameters(25, 0.0001), 15.5, 0.01,
-                                   0.01, direction::reverse);
+    nld::continuation_parameters params(nld::newton_parameters(25, 0.0001),
+                                        15.5, 0.01, 0.01,
+                                        nld::direction::reverse);
 
-    auto ip = periodic_parameters_constant{1, 200};
-    auto snb = saddle_node<runge_kutta_4>(non_autonomous(NLTVA), ip);
+    auto ip = nld::periodic_parameters_constant{1, 200};
+    auto snb = saddle_node<nld::runge_kutta_4>(nld::non_autonomous(NLTVA), ip);
 
-    vector_xdd2 u0(10);
+    nld::vector_xdd2 u0(10);
     u0 << 0.0372658, -2.25952, 0.781638, 2.70618, 0.158379, 0.601359, 0.0393662,
         0.782134, 1.11126, 0.15;
 
-    vector_xdd2 v0(10);
+    nld::vector_xdd2 v0(10);
     v0 << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0;
 
     ofstream fs("saddle_node.txt", std::ofstream::trunc);
 
     std::vector<double> Ai;
     std::vector<double> A0i;
-    for (auto [s, A0] : arc_length(snb, params, u0, v0,
-                                   concat(solution(), mean_amplitude(0)))) {
+    for (auto [s, A0] :
+         arc_length(snb, params, u0, v0,
+                    concat(nld::solution(), nld::mean_amplitude(0)))) {
         auto A = s(9);
         auto Omega = s(8);
         std::cout << "Solution = \n" << A << endl;

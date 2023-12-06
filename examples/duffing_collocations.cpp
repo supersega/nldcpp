@@ -2,20 +2,19 @@ constexpr auto PI = 3.14159265358979323846264338327950288;
 #include <fstream>
 #include <iostream>
 #include <vector>
-using namespace std;
 
 #include <nld/autocont.hpp>
 #include <nld/collocations.hpp>
-using namespace nld;
 
 #include <matplotlibcpp.h>
 namespace plt = matplotlibcpp;
 
 // Duffing oscilator with energy dissipation
-vector_xdd duffing(const vector_xdd &y, dual t, const vector_xdd &parameters) {
-    vector_xdd dy(y.size());
+nld::vector_xdd duffing(const nld::vector_xdd &y, nld::dual t,
+                        const nld::vector_xdd &parameters) {
+    nld::vector_xdd dy(y.size());
 
-    dual t8 = cos(2.0 * PI * t);
+    nld::dual t8 = cos(2.0 * PI * t);
 
     dy[0] = y[1];
     dy[1] = -0.1e-1 * y[1] - 0.1000000000e1 * y[0] -
@@ -65,8 +64,9 @@ auto initial_guess(nld::collocations::mesh_parameters parameters,
 }
 
 int main() {
-    continuation_parameters params(newton_parameters(25, 0.00001), 55.1, 0.001,
-                                   0.01, direction::reverse);
+    nld::continuation_parameters params(nld::newton_parameters(25, 0.00001),
+                                        55.1, 0.001, 0.01,
+                                        nld::direction::reverse);
 
     nld::collocations::mesh_parameters mesh_params{90, 3};
     auto basis_builder = nld::collocations::make_basis_builder<
@@ -82,7 +82,7 @@ int main() {
 
     std::vector<double> A1;
     std::vector<double> Omega;
-    for (auto v : arc_length(system, params, u0, v0, solution())) {
+    for (auto v : arc_length(system, params, u0, v0, nld::solution())) {
         nld::vector_xd u_0((v.size() - 1) / 2);
         for (std::size_t i = 0; i < u_0.size(); ++i) {
             u_0[i] = (double)v[i * 2];

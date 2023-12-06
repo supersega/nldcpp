@@ -3,16 +3,13 @@ constexpr auto PI = 3.14159265358979323846264338327950288;
 #include <cmath>
 #include <fstream>
 #include <iostream>
-#include <vector>
-using namespace std;
-
 #include <nld/autocont.hpp>
-using namespace nld;
+#include <vector>
 
 #include <matplotlibcpp.h>
 namespace plt = matplotlibcpp;
-vector_xdd NLTVA(const vector_xdd &y, dual t, dual Omega) {
-    vector_xdd dy(4);
+nld::vector_xdd NLTVA(const nld::vector_xdd &y, nld::dual t, nld::dual Omega) {
+    nld::vector_xdd dy(4);
 
     auto epsilon = 0.05;
     auto m1 = 1.0;
@@ -50,8 +47,9 @@ vector_xdd NLTVA(const vector_xdd &y, dual t, dual Omega) {
     return dy;
 }
 
-vector_xdd weakly_nonlinear_system(const vector_xdd &y, dual Omega) {
-    vector_xdd dy(4);
+nld::vector_xdd weakly_nonlinear_system(const nld::vector_xdd &y,
+                                        nld::dual Omega) {
+    nld::vector_xdd dy(4);
 
     dy[0] = y[2];
     dy[1] = y[3];
@@ -61,8 +59,8 @@ vector_xdd weakly_nonlinear_system(const vector_xdd &y, dual Omega) {
     return dy;
 }
 
-auto duffing_autonomous(const vector_xdd &y, dual omega) {
-    vector_xdd dy(4);
+auto duffing_autonomous(const nld::vector_xdd &y, nld::dual omega) {
+    nld::vector_xdd dy(4);
 
     double c = 0.01;
     double k = 1.0;
@@ -77,8 +75,8 @@ auto duffing_autonomous(const vector_xdd &y, dual omega) {
     return dy;
 }
 
-auto predator_prey(const vector_xdd &z, dual p1) {
-    vector_xdd dz(2);
+auto predator_prey(const nld::vector_xdd &z, nld::dual p1) {
+    nld::vector_xdd dz(2);
 
     auto u1 = z[0];
     auto u2 = z[1];
@@ -92,8 +90,8 @@ auto predator_prey(const vector_xdd &z, dual p1) {
     return dz;
 }
 
-auto simple_system_3(const vector_xdd &u, dual t, dual T) {
-    vector_xdd f(2);
+auto simple_system_3(const nld::vector_xdd &u, nld::dual t, nld::dual T) {
+    nld::vector_xdd f(2);
 
     f[0] = 0 - u[1];
     f[1] = u[0] - u[0] * u[0];
@@ -104,19 +102,18 @@ auto simple_system_3(const vector_xdd &u, dual t, dual T) {
 }
 
 int main() {
-    ofstream fs("afc_loop.csv");
-    fs << 'x' << ';' << 'y' << endl;
+    nld::continuation_parameters params(nld::newton_parameters(25, 0.00001),
+                                        2.1, 0.003, 0.001,
+                                        nld::direction::forward);
 
-    continuation_parameters params(newton_parameters(25, 0.00001), 2.1, 0.003,
-                                   0.001, direction::forward);
+    auto ip = nld::periodic_parameters_constant{1, 200};
+    auto bvp =
+        periodic<nld::runge_kutta_4>(nld::non_autonomous(simple_system_3), ip);
 
-    auto ip = periodic_parameters_constant{1, 200};
-    auto bvp = periodic<runge_kutta_4>(non_autonomous(simple_system_3), ip);
-
-    vector_xdd u0(3);
+    nld::vector_xdd u0(3);
     u0 << 0.0966822, 0.0, 6.30641;
 
-    vector_xdd v0(3);
+    nld::vector_xdd v0(3);
     v0 << 0.0, 0.0, 1.0;
 
     std::vector<double> Am;
@@ -124,7 +121,8 @@ int main() {
     std::cout << "Start\n";
     for (auto [solution, monodromy, amplitude] :
          arc_length(bvp, params, u0, v0,
-                    concat(solution(), monodromy(), mean_amplitude(0)))) {
+                    concat(nld::solution(), nld::monodromy(),
+                           nld::mean_amplitude(0)))) {
         auto period = solution(solution.size() - 1);
         std::cout << solution << std::endl;
         std::cout << "Frq: " << period << " Amplitude: " << amplitude

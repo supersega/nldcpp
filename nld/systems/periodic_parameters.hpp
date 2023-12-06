@@ -1,5 +1,4 @@
 #pragma once
-#include "nld/math/runge_kutta_parameters.hpp"
 #include <cstddef>
 #include <nld/math.hpp>
 

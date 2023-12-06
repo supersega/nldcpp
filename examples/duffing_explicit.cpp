@@ -6,16 +6,16 @@ constexpr auto PI = 3.14159265358979323846264338327950288;
 using namespace std;
 
 #include <nld/autocont.hpp>
-using namespace nld;
 
 #include <matplotlibcpp.h>
 namespace plt = matplotlibcpp;
 
 // Duffing oscilator with energy dissipation
-vector_xdd duffing(const vector_xdd &y, dual t, dual Omega, dual A) {
-    vector_xdd dy(y.size());
+nld::vector_xdd duffing(const nld::vector_xdd &y, nld::dual t, nld::dual Omega,
+                        nld::dual A) {
+    nld::vector_xdd dy(y.size());
 
-    dual t8 = cos(t);
+    nld::dual t8 = cos(t);
 
     dy[0] = y[1];
     dy[1] = -0.1e-1 * y[1] - 0.1000000000e1 * y[0] -
@@ -33,18 +33,19 @@ int main() {
         if (i == 6)
             i = 5;
 
-        continuation_parameters params(newton_parameters(25, 0.000005), 10.1,
-                                       0.01, 0.01, direction::forward);
+        nld::continuation_parameters params(
+            nld::newton_parameters(25, 0.000005), 10.1, 0.01, 0.01,
+            nld::direction::forward);
 
-        auto ip = periodic_parameters_constant{1, 200};
-        dual A = 1.0 * i;
-        auto bvp = periodic<runge_kutta_4>(
-            non_autonomous(std::bind(duffing, _1, _2, _3, A)), ip);
+        auto ip = nld::periodic_parameters_constant{1, 200};
+        nld::dual A = 1.0 * i;
+        auto bvp = periodic<nld::runge_kutta_4>(
+            nld::non_autonomous(std::bind(duffing, _1, _2, _3, A)), ip);
 
-        vector_xdd ys(3);
+        nld::vector_xdd ys(3);
         ys << 0.0, 0.0, 0.37;
 
-        vector_xdd vs(3);
+        nld::vector_xdd vs(3);
         vs << 0.0, 0.0, 1.0;
 
         std::vector<double> A1;
@@ -52,8 +53,9 @@ int main() {
         std::stringstream ss;
         ss << "/Volumes/Data/phd2023/Free vibrations/AFC_" << i << ".txt";
         ofstream fs(ss.str(), std::ofstream::trunc);
-        for (auto [v, A] : arc_length(bvp, params, ys, vs,
-                                      concat(solution(), mean_amplitude(0)))) {
+        for (auto [v, A] :
+             arc_length(bvp, params, ys, vs,
+                        concat(nld::solution(), nld::mean_amplitude(0)))) {
             Omega.push_back((double)v[2]);
             A1.push_back((double)A);
 
@@ -61,18 +63,19 @@ int main() {
         }
     }
 
-    continuation_parameters params(newton_parameters(25, 0.000005), 15.1, 0.01,
-                                   0.01, direction::forward);
+    nld::continuation_parameters params(nld::newton_parameters(25, 0.000005),
+                                        15.1, 0.01, 0.01,
+                                        nld::direction::forward);
 
-    auto ip = periodic_parameters_constant{1, 200};
-    dual omega = 0.4;
-    auto bvp = periodic<runge_kutta_4>(
-        non_autonomous(std::bind(duffing, _1, _2, omega, _3)), ip);
+    auto ip = nld::periodic_parameters_constant{1, 200};
+    nld::dual omega = 0.4;
+    auto bvp = periodic<nld::runge_kutta_4>(
+        nld::non_autonomous(std::bind(duffing, _1, _2, omega, _3)), ip);
 
-    vector_xdd ys(3);
+    nld::vector_xdd ys(3);
     ys << 0.0, 0.0, 0.33;
 
-    vector_xdd vs(3);
+    nld::vector_xdd vs(3);
     vs << 0.0, 0.0, 1.0;
 
     std::vector<double> A1;
@@ -81,8 +84,9 @@ int main() {
     ss << "/Volumes/Data/phd2023/Free vibrations/AAC"
        << ".txt";
     ofstream fs(ss.str(), std::ofstream::trunc);
-    for (auto [v, A] : arc_length(bvp, params, ys, vs,
-                                  concat(solution(), mean_amplitude(0)))) {
+    for (auto [v, A] :
+         arc_length(bvp, params, ys, vs,
+                    concat(nld::solution(), nld::mean_amplitude(0)))) {
         Force.push_back((double)v[2]);
         A1.push_back((double)A);
 
