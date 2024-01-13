@@ -48,9 +48,7 @@ auto call_fn() -> decltype(std::declval<Fn>()(nld::utils::any_type{},
 /// lambda - continuation parameter
 template <typename Fn>
 struct non_autonomous final {
-    /// TODO: investigate if continuation wrt non period requires
-    /// Integral-Phase cindition, and make better name.
-    static constexpr bool is_poincare_equation_needed = false;
+    static constexpr bool is_periodic_constraint_needed = false;
 
     using vector_t = decltype(concepts::non_autonomous::call_fn<Fn>());
 
@@ -86,7 +84,7 @@ struct non_autonomous final {
         requires concepts::non_autonomous::RnToRnMap<Fn>
     {
         auto result = function(y, t);
-        result *= T;
+        result *= T(0);
         return result;
     }
 
@@ -132,8 +130,7 @@ auto call_fn() -> decltype(std::declval<Fn>()(nld::utils::any_type{},
 /// lambda - continuation parameter
 template <typename Fn>
 struct autonomous final {
-    /// @brief indentify if period is a continuation parameter
-    static constexpr bool is_poincare_equation_needed =
+    static constexpr bool is_periodic_constraint_needed =
         concepts::autonomous::RnPlusOneToRnMap<Fn>;
 
     using vector_t = decltype(concepts::autonomous::call_fn<Fn>());
@@ -171,7 +168,7 @@ struct autonomous final {
         auto result = function(y);
         // Time variable transformation t -> t / period,
         // To be able to evaluate period in each iteration
-        result *= T;
+        result *= T(0);
         return result;
     }
 

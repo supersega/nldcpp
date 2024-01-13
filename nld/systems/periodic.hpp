@@ -14,7 +14,7 @@ namespace nld {
 namespace internal {
 
 template <typename Ds>
-concept PoincareEquationNeeded = Ds::is_poincare_equation_needed;
+concept PoincareEquationNeeded = Ds::is_periodic_constraint_needed;
 
 template <OdeSolver S, typename Ds>
 struct periodic;

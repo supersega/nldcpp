@@ -73,8 +73,8 @@ int main() {
         nld::collocations::lagrange_basis>();
     auto bc = [](const auto &u0, const auto &u1) { return u0 - u1; };
 
-    nld::collocations::boundary_value_problem system(duffing, bc, basis_builder,
-                                                     mesh_params, 2);
+    nld::periodic_collocations system(nld::non_autonomous(duffing),
+                                      basis_builder, mesh_params, 2);
 
     auto u0 = initial_guess(mesh_params, 2);
     nld::vector_xdd v0 = nld::vector_xdd::Zero(u0.size());

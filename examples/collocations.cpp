@@ -180,6 +180,7 @@ int main(int argc, char *argv[]) {
 
     nld::collocations::boundary_value_problem system(duffing, bc, basis_builder,
                                                      parameters, 2);
+
     auto u0 = initial_guess(parameters, 2);
     auto f = system(u0);
 

@@ -10,6 +10,7 @@
 #include <nld/systems/ode.hpp>
 #include <nld/systems/periodic.hpp>
 #include <nld/systems/periodic_base.hpp>
+#include <nld/systems/periodic_collocations.hpp>
 #include <nld/systems/periodic_parameters.hpp>
 #include <nld/systems/problem.hpp>
 #include <nld/systems/saddle_node.hpp>
