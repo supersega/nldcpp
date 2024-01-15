@@ -39,11 +39,26 @@ constexpr auto point2d(nld::index n, nld::index m) noexcept {
 constexpr auto mean_amplitude(nld::index coordinate) noexcept {
     return [coordinate]<typename P>(const P &periodic,
                                     const auto &variables) noexcept {
-        auto [initial, args] = integration_arguments(variables, periodic);
+        if constexpr (nld::SimpleShootingDiscretization<P>) {
+            auto [initial, args] = integration_arguments(variables, periodic);
 
-        return mean<typename P::solver_t>(periodic.underlying_function(),
-                                          periodic.integration_parameters(),
-                                          initial, args)[coordinate];
+            return mean<typename P::solver_t>(periodic.underlying_function(),
+                                              periodic.integration_parameters(),
+                                              initial, args)[coordinate];
+        } else if constexpr (nld::CollocationDiscretization<P>) {
+            using vector_t = std::decay_t<decltype(variables)>;
+
+            auto dim = periodic.dimension();
+            vector_t u((variables.size() - 1) / dim);
+            for (std::size_t i = 0; i < u.size(); ++i) {
+                u[i] = variables[i * dim + coordinate];
+            }
+
+            auto max = u.maxCoeff();
+            auto min = u.minCoeff();
+            decltype(max) R = (max - min) / 2.0;
+            return R;
+        }
     };
 }
 
@@ -73,4 +88,40 @@ constexpr auto monodromy() noexcept {
         return jacobian;
     };
 }
+
+/// @brief Mapper what generalized coordinate.
+/// @returns Lambda object what generate generalized coordinate.
+/// @param coordinate index of coordinate.
+constexpr auto generalized_coordinate(nld::index coordinate) noexcept {
+    return [coordinate]<typename P>(const P &periodic,
+                                    const auto &variables) noexcept {
+        if constexpr (nld::SimpleShootingDiscretization<P>) {
+            using vector_t = std::decay_t<decltype(variables)>;
+
+            auto [initial, args] = integration_arguments(variables, periodic);
+
+            vector_t solution = P::solver_t::solution(
+                periodic.underlying_function(),
+                periodic.integration_parameters(), initial, args);
+
+            // extract coordinate from ode solution as column vector
+            return solution.col(coordinate);
+        } else if constexpr (nld::CollocationDiscretization<P>) {
+            using vector_t = std::decay_t<decltype(variables)>;
+
+            auto dim = periodic.dimension();
+            vector_t u((variables.size() - 1) / dim);
+
+            // extract coordinate variables stored at next order
+            // from collocation variables
+            // TODO: remove node duplicates
+            for (std::size_t i = 0; i < u.size(); ++i) {
+                u[i] = variables[i * dim + coordinate];
+            }
+
+            return u;
+        }
+    };
+}
+
 } // namespace nld

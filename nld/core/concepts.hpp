@@ -133,6 +133,24 @@ template <typename F, typename At>
 concept Norm = requires(F f, At at) {
     { f.norm(at) } -> Scalar;
 };
+
+/// @brief is systed desctitized by simple shooting method.
+template <typename T>
+struct is_simple_shooting_discretization : std::false_type {};
+
+/// @brief is systed desctitized by simple shooting method.
+template <typename T>
+concept SimpleShootingDiscretization =
+    is_simple_shooting_discretization<T>::value;
+
+/// @brief is systed desctitized by collocaiton method.
+template <typename T>
+struct is_collocation_discretization : std::false_type {};
+
+/// @brief is systed desctitized by collocaiton method.
+template <typename T>
+concept CollocationDiscretization = is_collocation_discretization<T>::value;
+
 }; // namespace nld
 
 // namespace nld

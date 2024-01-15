@@ -33,7 +33,7 @@ public:
     explicit periodic_collocations(F &&f, Basis &&basis,
                                    nld::_cl::mesh_parameters parameters,
                                    std::size_t dimension)
-        : parameters(parameters), dimension(dimension),
+        : parameters(parameters), dimension_(dimension),
           bvp(std::forward<F>(f), bc{}, std::forward<Basis>(basis), parameters,
               dimension) {}
 
@@ -61,10 +61,16 @@ public:
         return bvp(u);
     }
 
+    /// @brief Get dimension of the dynamical systems
+    /// @return dimension of the dynamical systems
+    [[nodiscard]] constexpr auto dimension() const noexcept {
+        return dimension_;
+    }
+
 private:
     using bvp_t = nld::_cl::boundary_value_problem<F, bc, Basis>;
     nld::_cl::mesh_parameters parameters; ///< Mesh parameters
-    std::size_t dimension;                ///< Dimension of the dynamical system
+    std::size_t dimension_;               ///< Dimension of the dynamical system
     bvp_t bvp; ///< Boundary value problem with abstract boundary conditions
 };
 
@@ -72,4 +78,10 @@ template <typename F, typename Basis>
 periodic_collocations(F &&f, Basis &&basis,
                       nld::collocations::mesh_parameters parameters,
                       std::size_t dimension) -> periodic_collocations<F, Basis>;
+
+/// @brief is system desctitized by collocaiton method.
+template <typename F, typename Basis>
+struct is_collocation_discretization<periodic_collocations<F, Basis>>
+    : std::true_type {};
+
 } // namespace nld

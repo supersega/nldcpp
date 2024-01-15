@@ -223,4 +223,9 @@ auto saddle_node(Ds dynamic_system, periodic_parameters_constant parameters) {
     return internal::saddle_node<S, Ds>(std::move(dynamic_system),
                                         std::move(parameters));
 }
+
+template <OdeSolver S, typename Ds>
+struct is_simple_shooting_discretization<internal::saddle_node<S, Ds>>
+    : std::true_type {};
+
 } // namespace nld

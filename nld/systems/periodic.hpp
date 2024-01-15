@@ -1,6 +1,7 @@
 #pragma once
 
 #include <nld/core.hpp>
+#include <nld/core/concepts.hpp>
 #include <nld/math.hpp>
 
 #include <nld/systems/integration_arguments.hpp>
@@ -174,4 +175,10 @@ auto periodic(Ds dynamic_system, P parameters) {
     return internal::periodic<S, Ds>(std::move(dynamic_system),
                                      std::move(parameters));
 }
+
+/// @brief mark simple shooting discretization
+template <OdeSolver S, typename Ds>
+struct is_simple_shooting_discretization<internal::periodic<S, Ds>>
+    : std::true_type {};
+
 } // namespace nld
