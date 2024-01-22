@@ -124,4 +124,43 @@ constexpr auto generalized_coordinate(nld::index coordinate) noexcept {
     };
 }
 
+constexpr auto timestamps() noexcept {
+    return []<typename P>(const P &periodic, const auto &variables) noexcept {
+        if constexpr (nld::SimpleShootingDiscretization<P>) {
+            using vector_t = std::decay_t<decltype(variables)>;
+
+            auto [initial, args] = integration_arguments(variables, periodic);
+
+            vector_t solution = P::solver_t::solution(
+                periodic.underlying_function(),
+                periodic.integration_parameters(), initial, args);
+
+            // extract time from ode solution as column vector
+            return solution.col(0).template cast<double>();
+        } else if constexpr (nld::CollocationDiscretization<P>) {
+            using vector_t = std::decay_t<decltype(periodic.grid().nodes)>;
+
+            auto dim = periodic.dimension();
+            const auto &mesh_parameters = periodic.mesh_parameters();
+            const auto &grid = periodic.grid();
+            auto N = mesh_parameters.intervals;
+            auto m = mesh_parameters.collocation_points;
+
+            vector_t t(N * m + (N - 1) + 1);
+
+            // TODO: remove node duplicates
+            for (std::size_t i = 0; i < N; ++i) {
+                auto h = (grid.nodes[i + 1] - grid.nodes[i]);
+                auto dt = h / m;
+
+                for (std::size_t j = 0; j < m + 1; ++j) {
+                    t[i * (m + 1) + j] = grid.nodes[i] + dt * j;
+                }
+            }
+
+            return t;
+        }
+    };
+}
+
 } // namespace nld

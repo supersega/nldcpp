@@ -49,7 +49,7 @@ struct boundary_value_problem final {
           boundary_conditions(std::forward<Bc>(bc)),
           basis_builder(std::forward<Basis>(basis)), parameters(parameters),
           dimension(dimension),
-          grid(nld::collocations::mesh(
+          grid_(nld::collocations::mesh(
               parameters, nld::collocations::uniform_mesh_nodes,
               nld::collocations::legandre_collocation_points)) {}
 
@@ -78,7 +78,7 @@ struct boundary_value_problem final {
     /// @param v Value of the function
     template <typename At, typename V>
     auto jacobian(At &u, V &v) const -> nld::sparse_matrix_xd {
-        collocation_on_elements evaluator(grid, basis_builder);
+        collocation_on_elements evaluator(grid_, basis_builder);
 
         auto N = parameters.intervals;
         auto m = parameters.collocation_points;
@@ -110,7 +110,7 @@ struct boundary_value_problem final {
             // unknowns on element j
             auto u_j = u.segment(j * (m + 1) * n, (m + 1) * n);
             for (std::size_t k = 0; k < m; ++k) {
-                auto t = grid.collocation_points[j * m + k];
+                auto t = grid_.collocation_points[j * m + k];
 
                 // Next collocation equations: p'(t) - f(p(t), t, p) = 0
                 // We sutisfy this equation on each finite element at
@@ -261,7 +261,7 @@ struct boundary_value_problem final {
     /// @param u Variables to evaluate at
     /// @return Value of the boundary value problem
     auto operator()(const nld::vector_xdd &u) const -> nld::vector_xdd {
-        nld::collocations::collocation_on_elements evaluator(grid,
+        nld::collocations::collocation_on_elements evaluator(grid_,
                                                              basis_builder);
 
         auto N = parameters.intervals;
@@ -279,7 +279,7 @@ struct boundary_value_problem final {
             auto derivatives = evaluator.derivatives_in_collocation_points(j);
 
             for (std::size_t k = 0; k < m; ++k) {
-                auto t = grid.collocation_points[j * m + k];
+                auto t = grid_.collocation_points[j * m + k];
 
                 nld::vector_xdd p = nld::vector_xdd::Zero(n);
                 nld::vector_xdd p_prime = nld::vector_xdd::Zero(n);
@@ -318,6 +318,10 @@ struct boundary_value_problem final {
         return f;
     }
 
+    /// @brief mesh of the boundary value boundary_value_problem
+    /// @return mesh of the boundary value boundary_value_problem
+    [[nodiscard]] constexpr const auto &grid() const noexcept { return grid_; }
+
 private:
     F function;                 ///< Function of the boundary value problem
     Bc boundary_conditions;     ///< Boundary conditions of the boundary value
@@ -326,7 +330,7 @@ private:
     mesh_parameters parameters; ///< Mesh parameters of the
                                 ///< boundary value problem
     std::size_t dimension;      ///< Dimension of the boundary value problem
-    mesh grid;                  ///< Mesh of the boundary value problem
+    mesh grid_;                 ///< Mesh of the boundary value problem
 };
 
 template <concepts::CollocationFunction F, typename Bc, typename Basis>

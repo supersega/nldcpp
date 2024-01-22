@@ -67,6 +67,18 @@ public:
         return dimension_;
     }
 
+    /// @brief Get mesh parameters
+    /// @return mesh parameters
+    [[nodiscard]] constexpr const auto &mesh_parameters() const noexcept {
+        return parameters;
+    }
+
+    /// @brief Get mesh
+    /// @return mesh
+    [[nodiscard]] constexpr const auto &grid() const noexcept {
+        return bvp.grid();
+    }
+
 private:
     using bvp_t = nld::_cl::boundary_value_problem<F, bc, Basis>;
     nld::_cl::mesh_parameters parameters; ///< Mesh parameters
