@@ -2,17 +2,21 @@ constexpr auto PI = 3.14159265358979323846264338327950288;
 #include <array>
 #include <cmath>
 #include <cstddef>
-#include <fstream>
 #include <iostream>
 #include <iterator>
 #include <matplotlibcpp.h>
 #include <ostream>
+#include <queue>
+#include <span>
+#include <sstream>
 #include <sys/wait.h>
 #include <vector>
 
 #include <nld/autocont.hpp>
 #include <nld/core.hpp>
 #include <nld/math.hpp>
+
+#include <matplot/matplot.h>
 
 namespace plt = matplotlibcpp;
 
@@ -1150,11 +1154,13 @@ auto compute_initial_estimation_free(auto &ds, auto dofs) -> nld::vector_xdd {
     auto ip =
         nld::periodic_parameters_adaptive{1, 1.0 / 2048, 1.0 / 128.0, 5.0e-6};
     auto bvp = nld::periodic<nld::runge_kutta_45>(nld::autonomous(ds), ip);
-    auto bind = nld::bind_wrt_unknown(bvp, 0, 0.005, dim);
+    // auto bind = nld::bind_wrt_unknown(bvp, 0, 0.025, dim);
+    auto bind = nld::bind_wrt_unknown(bvp, 0, 0.5, dim);
 
     nld::vector_xdd u0(dim);
-    // u0 << 0.00473749, -0.00433584, 0.0912594, -0.011132, -0.0523547, 4.48523;
-    u0 << nld::vector_xdd::Zero(dim - 1), 5.01818;
+    u0 << 0.00473749, -0.00433584, 0.0912594, -0.011132, -0.0523547, 4.48523;
+    // std::cout << "Initial value is : " << u0 << '\n';
+    // u0 << nld::vector_xdd::Zero(dim - 1), 5.01818;
 
     if (nld::newton(bind, wrt(u0), at(u0), nld::newton_parameters(50, 1.0e-6)))
         std::cout << "Root value is : " << u0 << '\n';
@@ -1207,6 +1213,34 @@ auto initial_guess(auto &ds, nld::collocations::mesh_parameters parameters,
     return u;
 }
 
+auto to_std_vector(const nld::vector_xdd &v) {
+    std::vector<double> std_v(v.size());
+    for (std::size_t i = 0; i < v.size(); ++i) {
+        std_v[i] = static_cast<double>(v(i));
+    }
+    return std_v;
+}
+
+void plot_collection_of_curves(std::span<std::vector<double>> xss,
+                               std::span<std::vector<double>> yss) {
+    for (std::size_t i = 0; i < xss.size(); ++i) {
+        auto xs = xss[i];
+        auto ys = yss[i];
+        plt::plot(xs, ys);
+    }
+}
+
+void plot_curve_with_dots(std::span<double> xs, std::span<double> ys,
+                          std::span<double> pxs, std::span<double> pys) {
+    plt::plot(xs, ys, "k-");
+
+    for (std::size_t i = 0; i < pxs.size(); ++i) {
+        auto px = pxs[i];
+        auto py = pys[i];
+        plt::plot({px}, {py}, {{"marker", "o"}, {"linestyle", ""}});
+    }
+}
+
 int main(int argc, char *argv[]) {
     auto material = Material{7800, 2.1e11};
     auto geometry = Geometry{0.177, 0.01, 0.01};
@@ -1221,14 +1255,14 @@ int main(int argc, char *argv[]) {
     auto semnc = chcbeam.Phi(2);
 
     BeamTraits<CHTag> traits(beam);
-    const size_t dofs = 2;
+    const size_t dofs = 3;
     CrackedCaddemiBeamDynamicSystem<CHTag> ds{
         cracked_beam, Force{beam.geometry.length / 2.0, 1'500.0}, 0.01, dofs};
 
     nld::collocations::mesh_parameters mesh_parameters{50, 4};
     auto initial = initial_guess(ds, mesh_parameters, dofs);
-    nld::continuation_parameters params(nld::newton_parameters(100, 0.0001),
-                                        19.9, 0.0001, 0.002,
+    nld::continuation_parameters params(nld::newton_parameters(100, 0.00001),
+                                        19.5, 0.001, 0.01,
                                         nld::direction::reverse);
 
     auto basis_builder = nld::collocations::make_basis_builder<
@@ -1244,31 +1278,146 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Start\n";
 
+    std::queue<double> frequencies;
+    frequencies.push(1.34);
+    frequencies.push(1.4);
+    frequencies.push(1.46);
+    frequencies.push(1.51);
+    // frequencies.push(1.4);
+    // frequencies.push(1.43);
+    // frequencies.push(1.46);
+    // frequencies.push(1.49);
+    // frequencies.push(1.51);
+    // frequencies.push(1.52);
+    // amplitudes.push(0.05);
+    // amplitudes.push(0.1);
+    // amplitudes.push(0.15);
+    // amplitudes.push(0.2);
+    // amplitudes.push(0.25);
+    // amplitudes.push(0.275);
+    // amplitudes.push(0.5);
+    // amplitudes.push(0.525);
+    // amplitudes.push(0.545);
+    // amplitudes.push(0.525);
+    // amplitudes.push(0.5);
+    // amplitudes.push(0.45);
+    // amplitudes.push(0.4);
+    // amplitudes.push(0.375);
+    std::vector<std::vector<double>> u0s;
+    std::vector<std::vector<double>> u1s;
+    std::vector<std::vector<double>> u2s;
+    std::vector<std::vector<double>> tss;
     std::vector<double> Omega, A1;
-    for (auto solution : nld::arc_length(bvp, params, u0, nld::solution())) {
-        nld::dual om = 2.0 * PI / solution(solution.size() - 1);
+    std::vector<double> Omega_selected, A1_selected;
+    size_t counter = 0;
+    size_t counter2 = 0;
+    plt::figure_size(1200, 600);
+    for (auto [solution, mean_amplitude, u0, u1, u2, ts] : nld::arc_length(
+             bvp, params, u0,
+             concat(nld::solution(), nld::mean_amplitude(0),
+                    nld::generalized_coordinate(0),
+                    nld::generalized_coordinate(1),
+                    nld::generalized_coordinate(2), nld::timestamps()))) {
+        double om = (double)nld::dual(2.0 * PI / solution(solution.size() - 1));
         if (om < 0.0)
             break;
 
-        nld::vector_xd u_0((solution.size() - 1) / 2 / dofs);
-        for (std::size_t i = 0; i < u_0.size(); ++i) {
-            u_0[i] = (double)solution[i * 2 * dofs];
-        }
-
-        auto max = u_0.maxCoeff();
-        auto min = u_0.minCoeff();
-        auto A1_ = (max - min) / 2.0;
+        auto A1_ = (double)(mean_amplitude);
 
         Omega.push_back((double)om);
-        A1.push_back((double)A1_);
+        A1.push_back(A1_);
 
-        std::cout << "Omega: " << om << "A1: " << A1_ << std::endl;
+        // auto x = to_std_vector(u0);
+        // auto y = to_std_vector(u1);
+
+        // if (counter % 50 == 0) {
+        //     plt::clf();
+        //     plt::plot(x, y);
+        //     plt::ylabel(R"($q_2$)");
+        //     plt::xlabel(R"($q_1$)");
+        //
+        //     std::stringstream ss;
+        //     ss << std::setw(4) << std::setfill('0') << counter2;
+        //
+        //     std::string filename = "anim/frame_" + ss.str() + ".png";
+        //     std::cout << "Save frame: " << filename << std::endl;
+        //     plt::save(filename);
+        //     counter2++;
+        // }
+        // counter++;
+
+        auto target_frequency = frequencies.front();
+        if (std::abs(om - target_frequency) < 0.005) {
+            Omega_selected.push_back((double)om);
+            A1_selected.push_back(A1_);
+            u0s.push_back(to_std_vector(u0));
+            u1s.push_back(to_std_vector(u1));
+            u2s.push_back(to_std_vector(u2));
+            tss.push_back(to_std_vector(ts));
+            std::cout << "Store NNM for Amplitude: " << om << "A1: " << A1_
+                      << std::endl;
+            std::cout << "u size: " << u0.size() << std::endl;
+            std::cout << "t size: " << ts.size() << std::endl;
+            std::cout << "timestamps:\n" << ts << std::endl;
+            frequencies.pop();
+        }
+
+        std::cout << "Omega: " << om << "A1: " << (double)mean_amplitude
+                  << std::endl;
     }
 
-    plt::plot(Omega, A1, "k-");
+    // auto timestamps = tss.back();
+    // auto _u0 = u0s.back();
+    // auto _u1 = u1s.back();
+    // auto _u2 = u2s.back();
+
+    // for (std::size_t i = 0; i < _u0.size(); ++i) {
+    //     auto u0i = _u0[i];
+    //     auto u1i = _u1[i];
+    //     auto u2i = _u2[i];
+    //
+    //     auto N = 200;
+    //     auto dx = 1.0 / N;
+    //
+    //     std::vector<double> x(N + 1);
+    //     std::vector<double> y(N + 1);
+    //
+    //     for (std::size_t i = 0; i < N + 1; ++i) {
+    //         x[i] = i * dx;
+    //         y[i] = traits.Phi(0)(x[i]) * u0i + traits.Phi(1)(x[i]) * u1i +
+    //                traits.Phi(2)(x[i]) * u2i;
+    //     }
+    //
+    //     plt::clf();
+    //     plt::xlim(0.0, 1.0);
+    //     plt::ylim(-1.0, 1.0);
+    //     plt::plot(x, y);
+    //     plt::ylabel(R"($\frac{y}{h}$)");
+    //     plt::xlabel(R"($\frac{x}{l}$)");
+    //     std::stringstream ss;
+    //     ss << std::setw(4) << std::setfill('0') << i;
+    //
+    //     std::string filename = "anim/frame_" + ss.str() + ".png";
+    //
+    //     std::cout << "Save frame: " << filename << std::endl;
+    //
+    //     plt::save(filename);
+    // }
+
+    plt::figure_size(1200, 600);
+    //
+    plt::subplot(1, 2, 1);
+    plot_curve_with_dots(Omega, A1, Omega_selected, A1_selected);
     plt::ylabel(R"($A_1$)");
     plt::xlabel(R"($\Omega$)");
-    plt::ylim(0.005, 0.3);
+
+    plt::subplot(1, 2, 2);
+    plot_collection_of_curves(u0s, u2s);
+    plt::ylabel(R"($q_3$)");
+    plt::xlabel(R"($q_1$)");
+    //
+    plt::save("internal_resonans_A3_q1q3.pdf");
+
     plt::show();
 
     return 0;
