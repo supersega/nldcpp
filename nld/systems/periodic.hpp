@@ -171,8 +171,8 @@ auto integration_arguments(
 /// \f$\dot{q} = \theta(q, t, \lambda)\f$.
 /// @param parameters parameters of ODE integration
 template <OdeSolver S, typename Ds, typename P>
-auto periodic(Ds dynamic_system, P parameters) {
-    return internal::periodic<S, Ds>(std::move(dynamic_system),
+auto periodic(Ds &&dynamic_system, P parameters) {
+    return internal::periodic<S, Ds>(std::forward<Ds>(dynamic_system),
                                      std::move(parameters));
 }
 

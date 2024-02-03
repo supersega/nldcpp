@@ -89,7 +89,7 @@ struct arc_length_representation final {
 
         auto value = v.head(dim - 1);
 
-        auto keller = [*this](auto &val) { return arc_length_equation(val); };
+        auto keller = [this](auto &val) { return arc_length_equation(val); };
         auto dkeller = autodiff::forward::gradient(keller, nld::wrt(at),
                                                    nld::at(at), v(dim - 1));
 

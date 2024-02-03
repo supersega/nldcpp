@@ -41,8 +41,8 @@ namespace nld {
 template <typename F, typename V, typename T, typename M>
 auto arc_length(F &&function, nld::continuation_parameters parameters,
                 V unknowns, T tangential, M map) {
-    return nld::internal::arc_length_raw(std::forward<F>(function), parameters,
-                                         unknowns, tangential, map);
+    return nld::internal::arc_length_raw<F, V, T, M>(
+        std::forward<F>(function), parameters, unknowns, tangential, map);
 }
 
 /// @brief Solves continuation problem for nonlinear function using arc length

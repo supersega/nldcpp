@@ -20,8 +20,11 @@ namespace nld::internal {
 /// @param tangential Initial guess vector which has structure (u, lambda)
 /// @param map Function to map solution f: (V, R) -> MappedType.
 /// @return Generator which yields solution on iteration.
+/// @note This takes F as a value, because coroutines can't handle
+/// references properly, for more details see:
+/// https://toby-allsopp.github.io/2017/04/22/coroutines-reference-params.html
 template <typename F, Vector V, Vector T, typename M>
-auto arc_length_raw(F &&function, nld::continuation_parameters parameters,
+auto arc_length_raw(F function, nld::continuation_parameters parameters,
                     V unknowns, T tangential, M map) noexcept
     -> cppcoro::generator<decltype(map(std::declval<F>(), std::declval<V>()))> {
     auto [newton_parameters, tail, min_step, max_step, dir] = parameters;

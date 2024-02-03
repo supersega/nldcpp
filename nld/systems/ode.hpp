@@ -53,7 +53,7 @@ struct non_autonomous final {
     using vector_t = decltype(concepts::non_autonomous::call_fn<Fn>());
 
     /// @brief Make non autonomous system.
-    explicit non_autonomous(Fn f) : function(f) {}
+    explicit non_autonomous(Fn &&f) : function(std::forward<Fn>(f)) {}
 
     /// @brief Operator to wrap function for earthier usage.
     /// @param y State variables for ODE.
@@ -91,6 +91,9 @@ struct non_autonomous final {
 private:
     Fn function; ///< Underlying function represented dynamic system.
 };
+
+template <typename Fn>
+non_autonomous(Fn &&) -> non_autonomous<Fn>;
 
 template <typename T>
 struct is_non_autonomous : std::false_type {};
@@ -136,7 +139,7 @@ struct autonomous final {
     using vector_t = decltype(concepts::autonomous::call_fn<Fn>());
 
     /// @brief Make autonomous system.
-    explicit autonomous(Fn f) : function(f) {}
+    explicit autonomous(Fn &&f) : function(std::forward<Fn>(f)) {}
 
     /// @brief Operator to wrap function for earthier usage.
     /// @param y State variables for ODE.
@@ -175,6 +178,9 @@ struct autonomous final {
 private:
     Fn function; ///< Underlying function represented dynamic system.
 };
+
+template <typename Fn>
+autonomous(Fn &&) -> autonomous<Fn>;
 
 template <typename T>
 struct is_autonomous : std::false_type {};
