@@ -145,12 +145,12 @@ constexpr auto timestamps() noexcept {
 
             auto [initial, args] = integration_arguments(variables, periodic);
 
-            vector_t solution = P::solver_t::solution(
+            auto solution = P::solver_t::solution(
                 periodic.underlying_function(),
                 periodic.integration_parameters(), initial, args);
 
             // extract time from ode solution as column vector
-            return solution.col(0).template cast<double>();
+            return solution.col(initial.size()).template cast<double>();
         } else if constexpr (nld::CollocationDiscretization<P>) {
             using vector_t = nld::vector_xd;
 

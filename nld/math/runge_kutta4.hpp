@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <nld/core.hpp>
 
 #include <nld/math/evaluate.hpp>
@@ -48,15 +49,21 @@ struct runge_kutta_4 final {
 
         auto solution_at_end = initial;
 
-        nld::matrix_xd solution(intervals + 1, initial.size());
+        nld::matrix_xd solution(intervals + 1, initial.size() + 1);
         solution.row(0) = initial.template cast<double>();
 
         for (nld::index i = 0; i < intervals; i++) {
             solution_at_end = nld::math::detail::runge_kutta_4_step(
                 ode, start, start + step, solution_at_end, args);
-            solution.row(i + 1) = solution_at_end.template cast<double>();
+            solution.row(i + 1).head(solution_at_end.size()) =
+                solution_at_end.template cast<double>();
             start += step;
         }
+
+        nld::vector_xd timestamps = nld::vector_xd::LinSpaced(
+            intervals + 1, parameters.start, parameters.end);
+
+        solution.col(initial.size()) = timestamps;
 
         return solution;
     }
