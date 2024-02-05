@@ -5,7 +5,7 @@ clang=/Volumes/Data/clang/clang+llvm-12.0.0-x86_64-apple-darwin/bin/clang
 clangpp=/Volumes/Data/clang/clang+llvm-12.0.0-x86_64-apple-darwin/bin/clang++
 vcpkg=/Volumes/Data/dev/vcpkg/scripts/buildsystems/vcpkg.cmake
 build_dir=build
-build_type=ReleaseWithDebInfo
+build_type=Release
 enable_asan=FALSE
 
 $cmake \
