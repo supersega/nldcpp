@@ -14,3 +14,4 @@
 #include <nld/systems/periodic_parameters.hpp>
 #include <nld/systems/problem.hpp>
 #include <nld/systems/saddle_node.hpp>
+#include <nld/systems/utility.hpp>

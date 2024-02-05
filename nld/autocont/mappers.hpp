@@ -109,11 +109,9 @@ constexpr auto generalized_coordinate(nld::index coordinate) noexcept {
                const P &periodic,
                const auto &variables) noexcept -> nld::vector_xd {
         if constexpr (nld::SimpleShootingDiscretization<P>) {
-            using vector_t = std::decay_t<decltype(variables)>;
-
             auto [initial, args] = integration_arguments(variables, periodic);
 
-            vector_t solution = P::solver_t::solution(
+            auto solution = P::solver_t::solution(
                 periodic.underlying_function(),
                 periodic.integration_parameters(), initial, args);
 
@@ -141,8 +139,6 @@ constexpr auto timestamps() noexcept {
     return []<typename P>(const P &periodic,
                           const auto &variables) noexcept -> nld::vector_xd {
         if constexpr (nld::SimpleShootingDiscretization<P>) {
-            using vector_t = std::decay_t<decltype(variables)>;
-
             auto [initial, args] = integration_arguments(variables, periodic);
 
             auto solution = P::solver_t::solution(

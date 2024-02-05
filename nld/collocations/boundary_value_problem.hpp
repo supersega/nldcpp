@@ -322,6 +322,13 @@ struct boundary_value_problem final {
     /// @return mesh of the boundary value boundary_value_problem
     [[nodiscard]] constexpr const auto &grid() const noexcept { return grid_; }
 
+    /// @brief the underlying function of the boundary value
+    /// boundary_value_problem
+    /// @return underlying function
+    [[nodiscard]] auto underlying_function() const noexcept -> const F & {
+        return function;
+    }
+
 private:
     F function;                 ///< Function of the boundary value problem
     Bc boundary_conditions;     ///< Boundary conditions of the boundary value

@@ -46,7 +46,7 @@ struct periodic final : nld::jacobian_mixin<periodic<S, Ds>>,
                         nld::periodic_base<Ds> {
 private:
     using problem_t = nld::problem<Ds>;
-    using dynamic_system_t = Ds;
+    using dynamic_system_t = std::decay_t<Ds>;
     using vector_t = typename dynamic_system_t::vector_t;
     using integration_parameters_t = typename S::integration_parameters_t;
     using periodic_base_t = nld::periodic_base<Ds>;
@@ -63,7 +63,8 @@ public:
         : periodic_base_t(std::forward<Ds>(ds)),
           parameters(parameters.to_integration_parameters()) {
         static_assert(
-            is_non_autonomous_v<Ds> || is_autonomous_v<Ds>,
+            is_non_autonomous_v<dynamic_system_t> ||
+                is_autonomous_v<dynamic_system_t>,
             "Wrong type for two_point_boundary_value_problem see docs");
     }
 

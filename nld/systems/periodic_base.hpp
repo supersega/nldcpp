@@ -5,21 +5,12 @@
 
 namespace nld {
 
-/// @brief Base periodic problem class.
-/// @tparam T Type.
-template <typename T>
-struct periodic_base;
+namespace internal {
 
-/// @brief If dynamic system is autonomous then we have to know previous
-/// solution.
-/// @tparam Fn Generic function type.
-template <typename Fn>
-struct periodic_base<nld::autonomous<Fn>> : nld::problem<nld::autonomous<Fn>> {
-    using function_t = nld::autonomous<Fn>;
+template <typename F>
+struct with_previous_solution {
+    using function_t = std::decay_t<F>;
     using vector_t = typename function_t::vector_t;
-    using problem_t = nld::problem<function_t>;
-
-    using problem_t::problem_t;
 
     /// @brief Set previous solution
     template <typename Vector>
@@ -36,14 +27,20 @@ protected:
     vector_t previous_step_solution;
 };
 
-/// @brief If dynamic system is non autonomous then we don't have to know
-/// previous solution.
-/// @tparam Fn Generic function type.
-template <typename Fn>
-struct periodic_base<nld::non_autonomous<Fn>>
-    : nld::problem<nld::non_autonomous<Fn>> {
-    using function_t = nld::non_autonomous<Fn>;
-    using problem_t = nld::problem<function_t>;
+template <typename F>
+struct without_previous_solution {};
+
+} // namespace internal
+
+/// @brief Base periodic problem class.
+/// @tparam T Type.
+template <typename T>
+struct periodic_base
+    : nld::problem<T>,
+      std::conditional_t<nld::is_autonomous_v<std::decay_t<T>>,
+                         internal::with_previous_solution<T>,
+                         internal::without_previous_solution<T>> {
+    using problem_t = nld::problem<T>;
 
     using problem_t::problem_t;
 };

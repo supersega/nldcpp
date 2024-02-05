@@ -39,7 +39,7 @@ struct runge_kutta_4 final {
     /// @param parameters Integration parameters.
     /// @param initial Initial conditions.
     /// @param args Arguments tail to ode to make call possible.
-    /// @returns solution on interval.
+    /// @returns solution on interval as matrix, where last column is time.
     template <typename DS, Vector V, typename T = std::tuple<>>
     static auto solution(const DS &ode, integration_parameters_t parameters,
                          const V &initial, T &&args = no_arguments())

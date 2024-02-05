@@ -79,6 +79,12 @@ public:
         return bvp.grid();
     }
 
+    /// @brief Get underlying function
+    /// @return underlying function
+    [[nodiscard]] constexpr const auto &underlying_function() const noexcept {
+        return bvp.underlying_function();
+    }
+
 private:
     using bvp_t = nld::_cl::boundary_value_problem<F, bc, Basis>;
     nld::_cl::mesh_parameters parameters; ///< Mesh parameters
