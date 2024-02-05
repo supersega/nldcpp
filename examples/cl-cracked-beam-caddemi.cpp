@@ -5,10 +5,10 @@ constexpr auto PI = 3.14159265358979323846264338327950288;
 #include <iostream>
 #include <iterator>
 #include <matplotlibcpp.h>
+#include <memory>
 #include <ostream>
 #include <queue>
 #include <span>
-#include <sstream>
 #include <sys/wait.h>
 #include <vector>
 
@@ -514,6 +514,7 @@ struct CrackedBeamTraits;
 
 template <>
 struct CrackedBeamTraits<CHTag> {
+
     CrackedBeamTraits(CrackedBeam cb) : cracked_beam(cb) {
         calculate_roots();
         calculate_lambdai();
@@ -522,6 +523,10 @@ struct CrackedBeamTraits<CHTag> {
         calculate_Psi();
         calculate_S_factor();
         calculate_normalization_factors();
+    }
+
+    ~CrackedBeamTraits() {
+        std::cout << "CrackedBeamTraits destructor called" << std::endl;
     }
 
     auto S_overline(std::size_t m, std::size_t i) const {
@@ -708,6 +713,8 @@ struct Force {
     double amplitude;
 };
 
+#include <cassert>
+
 template <typename BC>
 struct CrackedCaddemiBeamDynamicSystem final {
     CrackedCaddemiBeamDynamicSystem(CrackedBeam cracked_beam, Force force,
@@ -717,6 +724,10 @@ struct CrackedCaddemiBeamDynamicSystem final {
           degrees_of_freedom{degrees_of_freedom},
           beam_traits{cracked_beam.beam}, cracked_beam_traits{cracked_beam} {
         calculate();
+    }
+
+    ~CrackedCaddemiBeamDynamicSystem() {
+        assert(false && "CrackedCaddemiBeamDynamicSystem destructor called");
     }
 
     void test() {
@@ -1061,6 +1072,8 @@ private:
     double first_frequence_no_crack;
     Eigen::Tensor<double, 4> R_bar_no_crack;
     Eigen::Tensor<double, 4> R_bar_crack;
+
+    std::unique_ptr<int> y0 = std::make_unique<int>(0);
 };
 
 void integrate_eigen_mode(CrackedBeam cracked_beam) {
@@ -1145,7 +1158,8 @@ private:
     Ds &ds;
 };
 
-auto compute_initial_estimation_free(auto &ds, auto dofs) -> nld::vector_xdd {
+auto compute_initial_estimation_free(const auto &cbvp, auto dofs)
+    -> nld::vector_xdd {
     auto dim = 2 * dofs;
     nld::continuation_parameters params(nld::newton_parameters(100, 0.00005),
                                         1.0, 0.001, 0.01,
@@ -1153,7 +1167,10 @@ auto compute_initial_estimation_free(auto &ds, auto dofs) -> nld::vector_xdd {
 
     auto ip =
         nld::periodic_parameters_adaptive{1, 1.0 / 2048, 1.0 / 128.0, 5.0e-6};
-    auto bvp = nld::periodic<nld::runge_kutta_45>(nld::autonomous(ds), ip);
+
+    auto ode = cbvp.underlying_function();
+    auto bvp =
+        nld::periodic<nld::runge_kutta_45>(cbvp.underlying_function(), ip);
     // auto bind = nld::bind_wrt_unknown(bvp, 0, 0.025, dim);
     auto bind = nld::bind_wrt_unknown(bvp, 0, 0.5, dim);
 
@@ -1176,41 +1193,7 @@ auto initial_guess(auto &ds, nld::collocations::mesh_parameters parameters,
 
     auto ig = compute_initial_estimation_free(ds, dofs);
 
-    nld::vector_xdd u0(dimension);
-    u0 << ig.head(dimension);
-
-    auto N = parameters.intervals;
-    auto m = parameters.collocation_points;
-    std::size_t n = dimension;
-
-    nld::vector_xdd u(N * n * m + (N - 1) * n + n + 1);
-    u.head(n) = u0;
-    u(u.size() - 1) = ig(ig.size() - 1);
-
-    auto ode = nld::autonomous(ds);
-
-    double t = 0.0;
-    double dt = 1.0 / (N * (m + 1));
-    std::cout << "dt = " << dt << std::endl;
-    for (std::size_t j = 0; j < N; ++j) {
-        for (std::size_t k = 0; k < m + 1; ++k) {
-            auto idx = j * (m + 1) * n + k * n;
-            // std::cout << "idx = " << idx << std::endl;
-
-            u.segment(j * (m + 1) * n + k * n, n) = u0;
-            u0 = nld::math::runge_kutta_4::end_solution(
-                ode, nld::math::constant_step_parameters{t, t + dt, 1}, u0,
-                std::tuple(nld::vector_xdd{u.tail(1)}));
-            t += dt;
-        }
-        if (j < N - 1) {
-            u.segment(j * (m + 1) * n + (m)*n, n) = u0;
-        }
-    }
-
-    std::cout << "t = " << t << std::endl;
-
-    return u;
+    return nld::make_collocation_unknowns(ds, ig);
 }
 
 auto to_std_vector(const nld::vector_xdd &v) {
@@ -1260,7 +1243,6 @@ int main(int argc, char *argv[]) {
         cracked_beam, Force{beam.geometry.length / 2.0, 1'500.0}, 0.01, dofs};
 
     nld::collocations::mesh_parameters mesh_parameters{50, 4};
-    auto initial = initial_guess(ds, mesh_parameters, dofs);
     nld::continuation_parameters params(nld::newton_parameters(100, 0.00001),
                                         19.5, 0.001, 0.01,
                                         nld::direction::reverse);
@@ -1270,6 +1252,7 @@ int main(int argc, char *argv[]) {
     nld::periodic_collocations bvp(nld::autonomous(ds), basis_builder,
                                    mesh_parameters, dofs * 2);
 
+    auto initial = initial_guess(bvp, mesh_parameters, dofs);
     nld::vector_xdd u0(initial.size());
     u0 << initial;
 
@@ -1313,7 +1296,9 @@ int main(int argc, char *argv[]) {
     size_t counter2 = 0;
     plt::figure_size(1200, 600);
     for (auto [solution, mean_amplitude, u0, u1, u2, ts] : nld::arc_length(
-             bvp, params, u0,
+             nld::periodic_collocations(nld::autonomous(ds), basis_builder,
+                                        mesh_parameters, dofs * 2),
+             params, u0,
              concat(nld::solution(), nld::mean_amplitude(0),
                     nld::generalized_coordinate(0),
                     nld::generalized_coordinate(1),
