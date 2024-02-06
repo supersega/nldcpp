@@ -89,15 +89,44 @@ constexpr auto half_swing(nld::index coordinate) noexcept {
 /// @returns Lambda object what evaluates monodromy Matrix.
 constexpr auto monodromy() noexcept {
     return []<typename P>(const P &periodic, auto variables) noexcept {
-        const auto dimension =
-            variables.size() - periodic.non_state_variables();
+        if constexpr (nld::SimpleShootingDiscretization<P>) {
+            const auto dimension =
+                variables.size() - periodic.non_state_variables();
 
-        decltype(periodic(variables)) result(variables.size());
-        auto jacobian = periodic.jacobian(wrt(variables.head(dimension)),
-                                          at(variables), result);
-        jacobian += nld::matrix_xd::Identity(dimension, dimension);
+            decltype(periodic(variables)) result(variables.size());
+            auto jacobian = periodic.jacobian(wrt(variables.head(dimension)),
+                                              at(variables), result);
+            jacobian += nld::matrix_xd::Identity(dimension, dimension);
 
-        return jacobian;
+            return jacobian;
+        }
+        // TODO: implement monodromy matrix for collocation in
+        // more correct way based on jacobian for periodic_collocations
+        else if constexpr (nld::CollocationDiscretization<P>) {
+            using vector_t = std::decay_t<decltype(variables)>;
+
+            const auto dimension = periodic.dimension();
+            const auto &mesh_parameters = periodic.mesh_parameters();
+            const auto &grid = periodic.grid();
+
+            auto N = mesh_parameters.intervals;
+            auto m = mesh_parameters.collocation_points;
+
+            auto ip = nld::periodic_parameters_constant{1, N * m};
+            auto bvp = nld::periodic<nld::runge_kutta_4>(
+                periodic.underlying_function(), ip);
+
+            vector_t unknowns(dimension + 1);
+            unknowns.head(dimension) = variables.head(dimension);
+            unknowns(dimension) = variables(variables.size() - 1);
+
+            decltype(periodic(variables)) result(unknowns.size());
+            auto jacobian = bvp.jacobian(wrt(unknowns.head(dimension)),
+                                         at(unknowns), result);
+            jacobian += nld::matrix_xd::Identity(dimension, dimension);
+
+            return jacobian;
+        }
     };
 }
 
