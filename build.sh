@@ -1,4 +1,4 @@
-#!bin/zsh
+#!/bin/zsh
 
 RED='\033[0;31m'
 NC='\033[0m'
@@ -24,7 +24,6 @@ function print_help() {
 
 opts=$(getopt --options hm:c:p:v:t:d:a --longoptions help,cmake_path:,clang_path:,clangpp_path:,vcpkg_path:,build_type:,build_dir:,enable_asan -- "$@") || print_help
 
-unset VCPKG_PATH
 while (($#))
 do
     case $1 in
@@ -41,9 +40,9 @@ do
 	shift
 done
 
-for var in VCPKG_PATH; do
-    if [ -z "${!var}" ]; then
-        log_error "$var is not set, please, read help!"
+for opt in VCPKG_PATH; do
+    if ! [[ -v $opt ]]; then
+        log_error "$opt is not set, please, read help!"
         print_help
     fi
 done
