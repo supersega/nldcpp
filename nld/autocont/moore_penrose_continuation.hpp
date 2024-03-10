@@ -3,8 +3,6 @@
 #include <nld/autocont/continuation_parameters.hpp>
 #include <nld/autocont/utils.hpp>
 
-#include <cppcoro/generator.hpp>
-
 namespace nld {
 /// @brief Async function which solves continuation problem for nonlinear function using Moore-Penrose continuation.
 /// TODO: Add user defined Jacobian (??), try numerical differentiation.

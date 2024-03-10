@@ -6,8 +6,6 @@
 #include <nld/autocont/continuation_parameters.hpp>
 #include <nld/autocont/step_updater.hpp>
 
-#include <cppcoro/generator.hpp>
-
 /// @note internal namespace should not be used in client code
 namespace nld::internal {
 /// @brief Raw version of arc length continuation algorithm.

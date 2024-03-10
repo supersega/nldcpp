@@ -11,7 +11,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libc++ -lc++abi")
 
 find_package(Eigen3 REQUIRED)
-find_package(cppcoro CONFIG REQUIRED)
 find_package(GSL REQUIRED)
 
 add_subdirectory(autodiff)

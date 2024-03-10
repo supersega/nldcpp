@@ -7,8 +7,6 @@
 #include <nld/systems/dimension.hpp>
 #include <nld/systems/first_guess.hpp>
 
-#include <cppcoro/generator.hpp>
-
 namespace nld {
 /// @brief Async function which solves continuation problem for nonlinear
 /// function using arc-length continuation.
@@ -41,8 +39,8 @@ namespace nld {
 template <typename F, typename V, typename T, typename M>
 auto arc_length(F &&function, nld::continuation_parameters parameters,
                 V unknowns, T tangential, M map) {
-    return nld::internal::arc_length_raw<F, V, T, M>(
-        std::forward<F>(function), parameters, unknowns, tangential, map);
+  return nld::internal::arc_length_raw<F, V, T, M>(
+      std::forward<F>(function), parameters, unknowns, tangential, map);
 }
 
 /// @brief Solves continuation problem for nonlinear function using arc length
@@ -57,10 +55,10 @@ auto arc_length(F &&function, nld::continuation_parameters parameters,
 template <typename F, typename V, typename M>
 auto arc_length(F &&function, nld::continuation_parameters parameters,
                 V unknowns, M map) {
-    V tangential = V::Zero(unknowns.size());
-    tangential(unknowns.size() - 1) = 1.0;
-    return nld::arc_length(std::forward<F>(function), parameters, unknowns,
-                           tangential, map);
+  V tangential = V::Zero(unknowns.size());
+  tangential(unknowns.size() - 1) = 1.0;
+  return nld::arc_length(std::forward<F>(function), parameters, unknowns,
+                         tangential, map);
 }
 
 /// @brief Solves continuation problem for nonlinear function using arc length
@@ -76,8 +74,8 @@ auto arc_length(F &&function, nld::continuation_parameters parameters,
 template <typename F, typename M>
 auto arc_length(F &&function, dimension size,
                 nld::continuation_parameters parameters, M map) {
-    auto [unknowns, tangential] = nld::evaluate_firs_guess(function, size);
-    return nld::arc_length(std::forward<F>(function), parameters, unknowns,
-                           tangential, map);
+  auto [unknowns, tangential] = nld::evaluate_firs_guess(function, size);
+  return nld::arc_length(std::forward<F>(function), parameters, unknowns,
+                         tangential, map);
 }
 } // namespace nld
