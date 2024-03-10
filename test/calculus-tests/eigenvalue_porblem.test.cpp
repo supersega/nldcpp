@@ -44,9 +44,9 @@ TEST_CASE("Hinged beam eigenvalue problem ") {
     auto xc = 0.5 * l;
     auto L = [=](auto x) -> adnum { return (m - 1.0) * exp(-2.0 * alpha * abs(x - xc) / d); };
     auto Q = scalar_function([=](adnum x) -> adnum { return 1.0; });
-    auto kinetic_energy = integral(rho * A * u * u, domain);
-    auto potential_energy = integral(E * I * Q * laplacian(u) * laplacian(u), domain);
-    auto shift = integral(u * delta_function(0.6), domain);
+    auto kinetic_energy = nld::integral(rho * A * u * u, domain);
+    auto potential_energy = nld::integral(E * I * Q * laplacian(u) * laplacian(u), domain);
+    auto shift = nld::integral(u * delta_function(0.6), domain);
 
     auto ep = solve_eigenvalue_problem<gauss_kronrod21>(kinetic_energy, potential_energy, integration_options { 1.0e-6, 1.0e-6, 200 });
     auto ef = ep.eigenvalues.cwiseSqrt();
@@ -54,11 +54,11 @@ TEST_CASE("Hinged beam eigenvalue problem ") {
 
     auto U = eigenfunctions(u, std::move(eigenvectors), 2);
     auto& x = sp.coords()[0];
-    auto nl_term = integral(integral(diff(U, autodiff::wrt(x)) * diff(U, autodiff::wrt(x)), domain) * diff(U, autodiff::wrt(x)) * diff(U, autodiff::wrt(x)), domain);
+    auto nl_term = nld::integral(nld::integral(diff(U, autodiff::wrt(x)) * diff(U, autodiff::wrt(x)), domain) * diff(U, autodiff::wrt(x)) * diff(U, autodiff::wrt(x)), domain);
 
     // auto TK = rho * A * U * U;
     // auto PK = E * I * Q * laplacian(U) * laplacian(U);
-    // //E * I * integral(Q * diff(U, x) * diff(U, x));
+    // //E * I * nld::integral(Q * diff(U, x) * diff(U, x));
 
     tensor_expression_calculator<gauss_kronrod21> calculator(integration_options { 1.0e-5, 1.0e-5, 300 });
     auto [M] = calculator.calculate(nl_term);

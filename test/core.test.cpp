@@ -22,7 +22,7 @@ SCENARIO("Tuple for_each", "[for_each]") {
         auto t = std::tie(a, b, c);
         WHEN("for_each change elements, references are changed") {
             nld::utils::for_each(t, [ ](auto& e) { e = 0; });
-            REQUIRE((a == Approx(0.0) && b == 0 && c == 0));
+            REQUIRE((a == Catch::Approx(0.0) && b == 0 && c == 0));
         }
     }
     GIVEN("empty tuple") {

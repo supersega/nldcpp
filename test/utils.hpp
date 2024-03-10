@@ -6,7 +6,7 @@ auto are_equal(const L& l, const R& r) {
         return false;
 
     for(auto i = 0u; i < l.size(); i++)
-        if (l[i] != Approx(r[i]))
+        if (l[i] != Catch::Approx(r[i]))
             return false;
     
     return true;

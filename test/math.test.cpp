@@ -64,14 +64,14 @@ SCENARIO("Runge-Kutta method on simple equation", "[runge_kutta_4]") {
                 REQUIRE(are_equal(expected_solution, sln.col(0)));
             }
             AND_THEN("max and min returns an expected value") {
-                REQUIRE(max<runge_kutta_4>(ode, constant_step_parameters{ 0.0, 1.0, intervals }, y0)(0) == Approx(expected_solution.maxCoeff()));
-                REQUIRE(min<runge_kutta_4>(ode, constant_step_parameters{ 0.0, 1.0, intervals }, y0)(0) == Approx(expected_solution.minCoeff()));
+                REQUIRE(max<runge_kutta_4>(ode, constant_step_parameters{ 0.0, 1.0, intervals }, y0)(0) == Catch::Approx(expected_solution.maxCoeff()));
+                REQUIRE(min<runge_kutta_4>(ode, constant_step_parameters{ 0.0, 1.0, intervals }, y0)(0) == Catch::Approx(expected_solution.minCoeff()));
             }
             AND_THEN("end_solution returns expected result") {
-                REQUIRE(runge_kutta_4::end_solution(ode, constant_step_parameters{ 0.0, 1.0, intervals }, y0)(0) == Approx(expected_solution(intervals)));
+                REQUIRE(runge_kutta_4::end_solution(ode, constant_step_parameters{ 0.0, 1.0, intervals }, y0)(0) == Catch::Approx(expected_solution(intervals)));
             }
             AND_THEN("half_swing returns expected value") {
-                REQUIRE(mean<runge_kutta_4>(ode, constant_step_parameters{ 0.0, 1.0, intervals }, y0)(0) == Approx(0.5 * (expected_solution.maxCoeff() - expected_solution.minCoeff())));
+                REQUIRE(mean<runge_kutta_4>(ode, constant_step_parameters{ 0.0, 1.0, intervals }, y0)(0) == Catch::Approx(0.5 * (expected_solution.maxCoeff() - expected_solution.minCoeff())));
             }
         }
     }
