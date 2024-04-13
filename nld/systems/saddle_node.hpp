@@ -2,6 +2,7 @@
 
 #include <array>
 #include <nld/core.hpp>
+#include <nld/systems/ode.hpp>
 #include <nld/systems/periodic_parameters.hpp>
 #include <nld/systems/problem.hpp>
 

@@ -53,15 +53,16 @@ auto arc_length_raw(F function, nld::continuation_parameters parameters,
             // Predicate solution for next step
             unknowns += updater.step() * tangential;
 
-            // We was able to calculate this point, so let us try to make
-            // continuation step bigger.
+            // We was able to calculate this point, so let us try to
+            // make continuation step bigger.
             updater.increase_step_if_possible();
         } else {
             // Minimal step reached, we have to stop continuation.
             if (!updater.decrease_step())
                 break;
 
-            // Fallback to previous point with smaller continuation step.
+            // Fallback to previous point with smaller continuation
+            // step.
             problem.set_arc_length_properties(old_unknowns, old_tangential,
                                               updater.step());
             unknowns = old_unknowns;
