@@ -14,6 +14,10 @@ find_package(GSL REQUIRED)
 add_subdirectory(autodiff)
 add_subdirectory(nld)
 
+find_package(Python COMPONENTS Interpreter Development)
+find_package(pybind11 REQUIRED)
+add_subdirectory(python)
+
 if (ENABLE_ASAN)
     message(STATUS "Enabling AddressSanitizer")
     add_compile_options(-fsanitize=address)

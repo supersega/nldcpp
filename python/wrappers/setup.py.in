@@ -1,0 +1,13 @@
+from distutils.core import setup
+
+setup(
+    name="nldpy",
+    version="${PROJECT_VERSION}",
+    description="NLD python bindings",
+    author="Serhii Malyshev",
+    author_email="na@na.com",
+    url="TODO",
+    license="MIT",
+    zip_safe=False,
+    python_requires=">=3.7",
+)
