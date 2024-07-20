@@ -56,7 +56,7 @@ struct boundary_value_problem final {
     /// @frief just for testing
     template <typename Wrt, typename At, typename V>
     auto jacobian(Wrt &&wrt, At &&at, V &v) const -> nld::sparse_matrix_xd {
-        auto u0 = std::get<0>(at);
+        auto u0 = std::get<0>(at.args);
         auto J_full = jacobian(u0, v);
         nld::sparse_matrix_xd J =
             J_full.block(0, 0, J_full.rows() - 1, J_full.cols() - 1);
@@ -135,9 +135,9 @@ struct boundary_value_problem final {
                 };
 
                 nld::vector_xdd value;
-                auto J = autodiff::forward::jacobian(
-                    collocation_equations, nld::wrt(u_j, parameters),
-                    nld::at(u_j, t, parameters), value);
+                auto J = autodiff::jacobian(collocation_equations,
+                                            nld::wrt(u_j, parameters),
+                                            nld::at(u_j, t, parameters), value);
 
                 // Fill Jacobian w.r.t. u_j
                 auto shift = j * (m + 1) * n + k * n;
@@ -194,9 +194,9 @@ struct boundary_value_problem final {
                 auto u_jr = u.segment((j + 1) * (m + 1) * n, (m + 1) * n);
 
                 nld::vector_xdd value;
-                auto J = autodiff::forward::jacobian(
-                    continuity_equations, nld::wrt(u_jl, u_jr),
-                    nld::at(u_jl, u_jr), value);
+                auto J = autodiff::jacobian(continuity_equations,
+                                            nld::wrt(u_jl, u_jr),
+                                            nld::at(u_jl, u_jr), value);
 
                 // Fill Jacobian w.r.t. u_jl for continuity equations
                 auto shift = j * (m + 1) * n + m * n;
@@ -231,9 +231,8 @@ struct boundary_value_problem final {
         auto u0 = u.head(n);
         auto uN = u.segment(N * m * n + (N - 1) * n, n);
         nld::vector_xdd value;
-        auto J = autodiff::forward::jacobian(boundary_conditions_equations,
-                                             nld::wrt(u0, uN), nld::at(u0, uN),
-                                             value);
+        auto J = autodiff::jacobian(boundary_conditions_equations,
+                                    nld::wrt(u0, uN), nld::at(u0, uN), value);
 
         // Fill Jacobian w.r.t. u0, uN for boundary conditions equations
         for (std::size_t l = 0; l < 2; ++l) {

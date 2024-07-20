@@ -43,7 +43,7 @@ int main() {
     u0 << 0.0, 0.0;
     nld::dual lambda0 = 0.0;
     auto jacobian_hopf =
-        autodiff::forward::jacobian(conservative, wrt(u0), at(u0, lambda0));
+        autodiff::jacobian(conservative, wrt(u0), at(u0, lambda0));
 
     // Eigenvalues and vectors of Jacobian matrix at Hopf bifurcation point
     Eigen::EigenSolver<Eigen::MatrixXd> es(jacobian_hopf);

@@ -13,10 +13,10 @@ inline constexpr index parameters = 2;
 
 template <typename F, typename Wrt, typename At>
 auto hessians(const F &f, Wrt &&wrt, At &&at) -> tensor_3d {
-    auto &dw = std::get<0>(wrt);
+    auto &dw = std::get<0>(wrt.args);
     const auto full_size = dw.size();
 
-    auto v = std::apply(f, at);
+    auto v = std::apply(f, at.args);
 
     const auto dim = v.size();
 
@@ -27,7 +27,7 @@ auto hessians(const F &f, Wrt &&wrt, At &&at) -> tensor_3d {
 
         for (index j = i; j < dim; j++) {
             dw[j].val.grad = 1.0;
-            v = std::apply(f, at);
+            v = std::apply(f, at.args);
 
             for (index k = 0; k < dim; k++) {
                 Hs(k, j, i) = v[k].grad.grad;
@@ -46,7 +46,7 @@ auto hessians(const F &f, Wrt &&wrt, At &&at) -> tensor_3d {
 
         for (index j = 0; j < dim; j++) {
             dw[j].val.grad = 1.0;
-            v = std::apply(f, at);
+            v = std::apply(f, at.args);
 
             for (index k = 0; k < dim; k++)
                 Hs(k, j, i + dim) = v[k].grad.grad;
@@ -139,8 +139,8 @@ struct saddle_node final : nld::problem<Ds> {
 
         value.head(states) = solution_at_end(variables) - state;
 
-        auto dyTdy0 = autodiff::forward::jacobian(solution_at_end, wrt(state),
-                                                  at(variables));
+        auto dyTdy0 =
+            autodiff::jacobian(solution_at_end, wrt(state), at(variables));
         auto phi = variables.segment(states, states);
 
         value.segment(states, states) = dyTdy0 * phi - phi;
@@ -156,10 +156,10 @@ struct saddle_node final : nld::problem<Ds> {
     /// @return Jacobian of saddle-node bifurcation detection system.
     template <typename At, typename Result>
     auto jacobian(At &at, Result &v) const -> matrix_xd {
-        using Vector = decltype(std::apply(*this, nld::at(at)));
+        using Vector = decltype(std::invoke(*this, at));
 
         auto &variables = at;
-        v = std::apply(*this, nld::at(at));
+        v = std::invoke(*this, at);
         const auto dim = variables.size();
         const auto states = (dim - internal::parameters) / 2;
 
@@ -167,8 +167,8 @@ struct saddle_node final : nld::problem<Ds> {
 
         nld::matrix_xd J = nld::matrix_xd::Zero(dim - 1, dim);
 
-        auto dyTdy0 = autodiff::forward::jacobian(solution_at_end, nld::wrt(at),
-                                                  nld::at(at));
+        auto dyTdy0 =
+            autodiff::jacobian(solution_at_end, nld::wrt(at), nld::at(at));
 
         auto Hs =
             internal::hessians(solution_at_end, nld::wrt(at), nld::at(at));

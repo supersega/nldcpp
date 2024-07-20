@@ -27,7 +27,7 @@ struct jacobian_mixin : nld::utils::crtp<F> {
     /// @return Jacobi matrix.
     template <typename Wrt, typename At, typename Result>
     auto jacobian(Wrt &&wrt, At &&at, Result &v) const {
-        return autodiff::forward::jacobian(this->derived(), wrt, at, v);
+        return autodiff::jacobian(this->derived(), wrt, at, v);
     }
 
     /// @brief Jacobian of dynamic system.
@@ -39,8 +39,8 @@ struct jacobian_mixin : nld::utils::crtp<F> {
     /// @return Jacobi matrix.
     template <typename At, typename Result>
     auto jacobian(At &at, Result &v) const {
-        return autodiff::forward::jacobian(this->derived(), nld::wrt(at),
-                                           nld::wrt(at), v);
+        return autodiff::jacobian(this->derived(), nld::wrt(at), nld::at(at),
+                                  v);
     }
 };
 } // namespace nld

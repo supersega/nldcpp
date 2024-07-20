@@ -90,8 +90,8 @@ struct arc_length_representation final {
         auto value = v.head(dim - 1);
 
         auto keller = [this](auto &val) { return arc_length_equation(val); };
-        auto dkeller = autodiff::forward::gradient(keller, nld::wrt(at),
-                                                   nld::at(at), v(dim - 1));
+        auto dkeller =
+            autodiff::gradient(keller, nld::wrt(at), nld::at(at), v(dim - 1));
 
         auto top_left = function.jacobian(at, value);
         detail::build_matrix(top_left, dkeller);
@@ -105,7 +105,7 @@ struct arc_length_representation final {
     template <typename Vec>
     auto tangential(Vec &variables) const -> Vec {
         // Tangential can be evaluated using Jacobi matrix of AL representation
-        using Result = decltype(std::apply(*this, at(variables)));
+        using Result = decltype(std::invoke(*this, variables));
 
         Result result;
         auto jac = this->jacobian(variables, result);
@@ -129,7 +129,7 @@ struct arc_length_representation final {
     /// @return Norm at point.
     template <typename At>
     auto norm(At &&at) const {
-        auto value = std::apply(*this, at);
+        auto value = std::apply(*this, at.args);
         return value.head(value.size() - 1).norm();
     }
 

@@ -11,7 +11,11 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 find_package(Eigen3 REQUIRED)
 find_package(GSL REQUIRED)
 
+option(AUTODIFF_BUILD_TESTS "Disable the compilation of the tests." OFF)
+option(AUTODIFF_BUILD_PYTHON "Disable the compilation of the python bindings." OFF)
+option(AUTODIFF_BUILD_EXAMPLES "Disable the compilation of the examples." OFF)
 add_subdirectory(autodiff)
+
 add_subdirectory(nld)
 
 find_package(Python COMPONENTS Interpreter Development)

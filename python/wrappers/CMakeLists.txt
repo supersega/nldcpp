@@ -2,7 +2,9 @@ file(GLOB_RECURSE CPP_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cpp)
 
 pybind11_add_module(nldpy ${CPP_FILES})
 
-target_include_directories(nldpy PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(nldpy LINK_PRIVATE autodiff::autodiff Eigen3::Eigen)
+
+target_include_directories(nldpy PUBLIC ${PROJECT_SOURCE_DIR})
 
 configure_file(setup.py.in ${CMAKE_CURRENT_BINARY_DIR}/setup.py)
 

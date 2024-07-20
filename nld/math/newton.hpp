@@ -1,6 +1,5 @@
 #pragma once
 
-#include "nld/core/aliases.hpp"
 #include <nld/core.hpp>
 
 #include <iostream>
@@ -38,8 +37,8 @@ bool moore_penrose_newton_step(F &&f, Wrt &&initial_guess,
 /// @param parameters Newton method parameters.
 /// @return Result of computation.
 template <typename F, typename Wrt, typename At, typename P>
-[[nodiscard]] auto newton(F &&f, Wrt &&wrt, At &&at, P parameters)
-    -> newton_info {
+[[nodiscard]] auto newton(F &&f, Wrt &&wrt, At &&at,
+                          P parameters) -> newton_info {
     // Loop of Newton method
     using std::forward;
     auto [max_iterations, tolerance] = parameters;
@@ -96,17 +95,18 @@ auto norm(const F &f, At &&at) {
     if constexpr (Norm<F, At>)
         return f.norm(at);
     else
-        return std::apply(f, at).norm();
+        return std::apply(f, at.args).norm();
 }
 
 // Internal function to get jacobian. Need it since nld wrappers has jacobian
 // method.
+// TODO: check if it is called anywhere. If not remove it.
 template <typename Function, typename Wrt, typename At, typename Result>
 auto jacobian(const Function &f, Wrt &&wrt, At &&at, Result &&F) {
     if constexpr (Jacobian<Function, Wrt, At, Result>)
         return f.jacobian(wrt, at, F);
     else
-        return autodiff::forward::jacobian(f, wrt, at, F);
+        return autodiff::jacobian(f, wrt, at, F);
 }
 
 // Internal function to get jacobian. Need it since nld wrappers has jacobian
@@ -116,20 +116,20 @@ auto jacobian(Function &f, At &at, Result &F) {
     if constexpr (JacobianFull<Function, At, Result>)
         return f.jacobian(at, F);
     else
-        return autodiff::forward::jacobian(f, nld::wrt(at), nld::at(at), F);
+        return autodiff::jacobian(f, nld::wrt(at), nld::at(at), F);
 }
 
 /// TODO: Avoid copy of vector (using xpr?) and optimize if `wrt` size == 1.
 /// Make enable to use scalar functions.
 template <typename F, typename Wrt, typename At, typename Float>
 auto newton_step(F &&f, Wrt &&initial, At &&at, Float tolerance) -> bool {
-    using Result = decltype(std::apply(f, at));
+    using Result = decltype(std::apply(f, at.args));
 
     Result value;
     auto jacobian = detail::jacobian(f, initial, at, value);
 
     Eigen::VectorXd result;
-    nld::utils::tuple_to_vector(initial, result);
+    nld::utils::tuple_to_vector(initial.args, result);
 
     if constexpr (FunctionWithPreviousStepSolution<F>)
         f.set_previous_solution(result);
@@ -139,14 +139,14 @@ auto newton_step(F &&f, Wrt &&initial, At &&at, Float tolerance) -> bool {
     result -= nld::math::linear_algebra::solve(jacobian,
                                                value.template cast<Float>());
 
-    nld::utils::vector_to_tuple(result, initial);
+    nld::utils::vector_to_tuple(result, initial.args);
     auto n = norm(f, at);
     return n < tolerance;
 }
 
 template <typename F, typename At, typename Float>
 auto newton_step(F &&f, At &at, Float tolerance) -> bool {
-    using Result = decltype(std::apply(f, nld::at(at)));
+    using Result = decltype(std::invoke(f, at));
 
     Result value;
     auto jacobian = detail::jacobian(f, at, value);
@@ -172,7 +172,7 @@ bool moore_penrose_newton_step(F &&f, Wrt &&wrt, Tan &&tan, At &&at,
                                Float tol) {
     auto wrts = count(wrt);
     nld::matrix_x<Float> jacobian(wrts, wrts);
-    decltype(std::apply(f, at)) v(wrts);
+    decltype(std::apply(f, at.args)) v(wrts);
     v(wrts - 1) = 0;
     auto Jxp = nld::math::detail::jacobian(f, wrt, at, v.head(wrts - 1));
     // Here we expect non square Jacobi matrix (wrts, wrts + 1)

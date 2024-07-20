@@ -8,23 +8,23 @@
 /* should be deleted - we have problem in autodiff*/
 using namespace Eigen;
 
-#include <autodiff/forward.hpp>
-#include <autodiff/forward/eigen.hpp>
+#include <autodiff/forward/dual.hpp>
+#include <autodiff/forward/dual/eigen.hpp>
 
 namespace nld {
 
 /// Internal function wrt.
 template <typename... Args>
 auto wrt(Args &...args) {
-    return autodiff::wrtpack(args...);
+    return autodiff::wrt(args...);
 }
 
-using autodiff::forward::at;
+using autodiff::at;
 
 using index = Eigen::Index;
 
-using dual = autodiff::forward::dual;
-using dual2 = autodiff::forward::HigherOrderDual<2>;
+using dual = autodiff::dual;
+using dual2 = autodiff::HigherOrderDual<2, double>;
 
 template <typename Real, int Rows, int Cols>
 using matrix_generic = Eigen::Matrix<Real, Rows, Cols>;

@@ -5,7 +5,7 @@
 #include <nld/core.hpp>
 #include <nld/math.hpp>
 
-#include <autodiff/forward.hpp>
+#include <autodiff/forward/dual.hpp>
 
 namespace nld::collocations {
 
@@ -87,8 +87,8 @@ struct collocation_on_elements final {
         for (std::size_t i = 0; i < m; ++i) {
             nld::dual t = collocations_mesh.collocation_points[shift + i];
             for (std::size_t j = 0; j < m + 1; ++j) {
-                using autodiff::forward::at;
-                using autodiff::forward::wrt;
+                using autodiff::at;
+                using autodiff::wrt;
 
                 auto dldt = autodiff::derivative(basis, wrt(t), at(j, t));
                 result(j, i) = dldt;
