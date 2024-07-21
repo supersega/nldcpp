@@ -11,16 +11,42 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 find_package(Eigen3 REQUIRED)
 find_package(GSL REQUIRED)
 
+option(NLD_BUILD_TESTS "Build the tests." OFF)
+option(NLD_BUILD_EXAMPLES "Build the examples." OFF)
+option(NLD_BUILD_PYTHON "Build the python bindings." OFF)
+
+message(STATUS "Building tests: ${NLD_BUILD_TESTS}")
+message(STATUS "Building examples: ${NLD_BUILD_EXAMPLES}")
+message(STATUS "Building python bindings: ${NLD_BUILD_PYTHON}")
+
+option(ENABLE_ASAN "Enable AddressSanitizer" OFF)
+
+if (NLD_BUILD_PYTHON)
+    find_package(Python COMPONENTS Interpreter Development)
+    find_package(pybind11 REQUIRED)
+    option(AUTODIFF_BUILD_PYTHON "Enable the compilation of the python bindings." ON)
+endif ()
+
+# Never build autodiff tests and examples
 option(AUTODIFF_BUILD_TESTS "Disable the compilation of the tests." OFF)
-# option(AUTODIFF_BUILD_PYTHON "Disable the compilation of the python bindings." OFF)
 option(AUTODIFF_BUILD_EXAMPLES "Disable the compilation of the examples." OFF)
+
 add_subdirectory(autodiff)
 
 add_subdirectory(nld)
 
-find_package(Python COMPONENTS Interpreter Development)
-find_package(pybind11 REQUIRED)
-add_subdirectory(python)
+if (NLD_BUILD_PYTHON)
+    add_subdirectory(python)
+endif ()
+
+if (NLD_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif ()
+
+if (NLD_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(test)
+endif ()
 
 if (ENABLE_ASAN)
     message(STATUS "Enabling AddressSanitizer")
@@ -28,8 +54,3 @@ if (ENABLE_ASAN)
     add_link_options(-fsanitize=address)
 endif ()
 
-if (${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
-    add_subdirectory(examples)
-    enable_testing()
-    add_subdirectory(test)
-endif ()

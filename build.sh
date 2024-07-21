@@ -19,6 +19,10 @@ function print_help() {
     echo "  -t, --build_type        Build type"
     echo "  -d, --build_dir         Build directory"
     echo "  -a, --enable_asan       Enable AddressSanitizer"
+    echo "    , --build_tests       Build tests"
+    echo "    , --build_examples    Build examples"
+    echo "    , --build_python      Build python bindings"
+    echo "    , --build_all         Build all"
     exit 1
 }
 
@@ -34,6 +38,10 @@ do
         -v|--vcpkg_path)   VCPKG_PATH=$2; shift;;
         -t|--build_type)   BUILD_TYPE=$2; shift;;
         -a|--enable_asan)  ENABLE_ASAN=$2; shift;;
+        --buld_tests)      BUILD_TESTS=TRUE;;
+        --build_examples)  BUILD_EXAMPLES=TRUE;;
+        --build_python)    BUILD_PYTHON=TRUE;;
+        --build_all)       BUILD_TESTS=TRUE; BUILD_EXAMPLES=TRUE; BUILD_PYTHON=TRUE;;
         *) >&2 log_error  "Unsupported option: $1"
             print_help;;
 	esac
@@ -54,6 +62,9 @@ vcpkg=$VCPKG_PATH
 build_dir=${BUILD_DIR:-build}
 build_type=${BUILD_TYPE:-Release}
 enable_asan="${ENABLE_ASAN:-FALSE}"
+build_tests="${BUILD_TESTS:-FALSE}"
+build_examples="${BUILD_EXAMPLES:-FALSE}"
+build_python="${BUILD_PYTHON:-FALSE}"
 
 $cmake \
     --no-warn-unused-cli \
@@ -62,6 +73,9 @@ $cmake \
     -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=TRUE \
     -DCMAKE_C_COMPILER:FILEPATH=$clang \
     -DCMAKE_CXX_COMPILER:FILEPATH=$clangpp \
+    -DNLD_BUILD_TESTS:BOOL=$build_tests \
+    -DNLD_BUILD_EXAMPLES:BOOL=$build_examples \
+    -DNLD_BUILD_PYTHON:BOOL=$build_python \
     -DENABLE_ASAN:BOOL=$enable_asan \
     -B $build_dir \
     -G "Unix Makefiles"
