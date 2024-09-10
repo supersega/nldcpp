@@ -23,6 +23,7 @@ option(ENABLE_ASAN "Enable AddressSanitizer" OFF)
 
 if (NLD_BUILD_PYTHON)
     find_package(Python COMPONENTS Interpreter Development)
+    message(STATUS "Python executable found in: ${Python_EXECUTABLE}")
     find_package(pybind11 REQUIRED)
     option(AUTODIFF_BUILD_PYTHON "Enable the compilation of the python bindings." ON)
 endif ()

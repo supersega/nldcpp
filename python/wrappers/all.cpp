@@ -1,40 +1,48 @@
+// Inherit flags from autodiff4py
+#include <autodiff/python/bindings/pybind11.hxx>
+
+#include <python/wrappers/arc_length.hpp>
+#include <python/wrappers/continuation_parameters.hpp>
+#include <python/wrappers/mappers.hpp>
+#include <python/wrappers/math.hpp>
+#include <python/wrappers/systems.hpp>
+#include <python/wrappers/types.hpp>
+
 #include <pybind11/eigen.h>
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 
 #include <nld/core.hpp>
 
-#include <iostream>
+#include <boost/hana.hpp>
 
 namespace py = pybind11;
 
+using namespace boost::hana::literals;
+
 namespace wrappers {
-
-void wrap_systems(py::module &m);
 void wrap_make_duffing(py::module &m);
-void wrap_test_caller(py::module &m);
-
-void caller(std::function<void(nld::dual)> f) { f(1.0); }
-
-auto make_callable() -> std::function<void(nld::dual)> {
-    return [](nld::dual x) {
-        x = 1.0;
-        std::cout << x << std::endl;
-    };
-}
-
-void wrap_test_caller(py::module &m) {
-    m.def("caller", &wrappers::caller);
-    m.def("make_callable", &wrappers::make_callable);
-}
 } // namespace wrappers
-//
 
 PYBIND11_MODULE(nldpy, m) {
     m.doc() = "nld bindings to python"; // optional module docstring
 
-    wrappers::wrap_systems(m);
-    wrappers::wrap_make_duffing(m);
+    // Wrap structures for continuation configuration
+    wrappers::wrap_direction(m);
+    wrappers::wrap_continuation_parameters(m);
 
-    wrappers::wrap_test_caller(m);
+    // Wrap mappers
+    wrappers::wrap_mappers(m);
+
+    // Wrap math
+    wrappers::wrap_math(m);
+
+    // Wrap systems
+    wrappers::wrap_systems(m);
+
+    // Wrap arc length continuation
+    wrappers::wrap_arc_length(m);
+
+    // Wrap duffing
+    wrappers::wrap_make_duffing(m);
 }

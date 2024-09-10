@@ -1,9 +1,11 @@
+#include <autodiff/python/bindings/pybind11.hxx>
 #include <nld/core.hpp>
 #include <nld/systems.hpp>
 #include <numbers>
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <python/wrappers/types.hpp>
 
 namespace py = pybind11;
 
@@ -25,8 +27,7 @@ nld::vector_xdd duffing(const nld::vector_xdd &u, nld::dual t,
     return du;
 }
 
-std::function<nld::vector_xdd(const nld::vector_xdd &, nld::dual, nld::dual)>
-make_duffing() {
+wrappers::non_autonomous::RnPlusOneToRnMapFnDual make_duffing() {
     return duffing;
 }
 

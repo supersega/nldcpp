@@ -50,7 +50,7 @@ struct runge_kutta_4 final {
         auto solution_at_end = initial;
 
         nld::matrix_xd solution(intervals + 1, initial.size() + 1);
-        solution.row(0) = initial.template cast<double>();
+        solution.row(0).head(initial.size()) = initial.template cast<double>();
 
         for (nld::index i = 0; i < intervals; i++) {
             solution_at_end = nld::math::detail::runge_kutta_4_step(

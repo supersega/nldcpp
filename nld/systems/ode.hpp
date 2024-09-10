@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <nld/core.hpp>
 #include <type_traits>
 

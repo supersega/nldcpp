@@ -1,0 +1,18 @@
+from distutils.core import setup
+
+setup(
+    name="nld",
+    version="${PROJECT_VERSION}",
+    description="The Python interface of the nld library.",
+    author="Serhii Malyshev",
+    author_email="aa@na.edu",
+    url="TODO",
+    license="MIT",
+    packages=["nld"],
+    package_data={
+        "nld": [
+            "nldpy${PYTHON_MODULE_EXTENSION}",
+            "nldpy/*" "*.pyi",
+        ],
+    },
+)
