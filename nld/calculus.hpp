@@ -19,4 +19,5 @@
 #include <nld/calculus/tensor_operators.hpp>
 #include <nld/calculus/tensor_size.hpp>
 #include <nld/calculus/test_functions.hpp>
+#include <nld/calculus/variable_integral.hpp>
 #include <nld/calculus/weighted_test_functions.hpp>

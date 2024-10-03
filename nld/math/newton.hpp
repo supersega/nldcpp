@@ -37,8 +37,8 @@ bool moore_penrose_newton_step(F &&f, Wrt &&initial_guess,
 /// @param parameters Newton method parameters.
 /// @return Result of computation.
 template <typename F, typename Wrt, typename At, typename P>
-[[nodiscard]] auto newton(F &&f, Wrt &&wrt, At &&at,
-                          P parameters) -> newton_info {
+[[nodiscard]] auto newton(F &&f, Wrt &&wrt, At &&at, P parameters)
+    -> newton_info {
     // Loop of Newton method
     using std::forward;
     auto [max_iterations, tolerance] = parameters;
@@ -119,6 +119,38 @@ auto jacobian(Function &f, At &at, Result &F) {
         return autodiff::jacobian(f, nld::wrt(at), nld::at(at), F);
 }
 
+template <typename Function, typename At, typename Result>
+auto gradient_finite_difference(Function &f, At &at, Result &F) {
+    auto n = at.size();
+
+    double h = 1e-3;
+
+    nld::vector_xd grad(n);
+    for (size_t i = 0; i < n; ++i) {
+        nld::vector_xd xl = at;
+        xl(i) -= h;
+        nld::vector_xd xr = at;
+        xr(i) += h;
+
+        auto fl = std::invoke(f, xl);
+        auto fr = std::invoke(f, xr);
+
+        grad(i) = (fr - fl) / (2 * h);
+        F = std::invoke(f, at);
+    }
+
+    return grad;
+}
+
+template <typename Function, typename At, typename Result>
+auto gradient(Function &f, At &at, Result &F) {
+    using number_t = decltype(std::invoke(f, at));
+    if constexpr (std::is_floating_point_v<number_t>)
+        return gradient_finite_difference(f, at, F);
+    else
+        return autodiff::gradient(f, nld::wrt(at), nld::at(at), F);
+}
+
 /// TODO: Avoid copy of vector (using xpr?) and optimize if `wrt` size == 1.
 /// Make enable to use scalar functions.
 template <typename F, typename Wrt, typename At, typename Float>
@@ -130,6 +162,7 @@ auto newton_step(F &&f, Wrt &&initial, At &&at, Float tolerance) -> bool {
 
     Eigen::VectorXd result;
     nld::utils::tuple_to_vector(initial.args, result);
+    Eigen::VectorXd previous_result = result;
 
     if constexpr (FunctionWithPreviousStepSolution<F>)
         f.set_previous_solution(result);
@@ -139,9 +172,12 @@ auto newton_step(F &&f, Wrt &&initial, At &&at, Float tolerance) -> bool {
     result -= nld::math::linear_algebra::solve(jacobian,
                                                value.template cast<Float>());
 
+    Eigen::VectorXd diff = result - previous_result;
     nld::utils::vector_to_tuple(result, initial.args);
-    auto n = norm(f, at);
-    return n < tolerance;
+
+    auto nf = norm(f, at);
+    auto na = diff.norm() / result.norm();
+    return nf < tolerance || na < tolerance;
 }
 
 template <typename F, typename At, typename Float>
@@ -152,6 +188,7 @@ auto newton_step(F &&f, At &at, Float tolerance) -> bool {
     auto jacobian = detail::jacobian(f, at, value);
 
     Eigen::VectorXd result = at.template cast<double>();
+    Eigen::VectorXd previous_result = result;
 
     if constexpr (FunctionWithPreviousStepSolution<F>)
         f.set_previous_solution(result);
@@ -161,9 +198,16 @@ auto newton_step(F &&f, At &at, Float tolerance) -> bool {
     result.head(value.size()) -= nld::math::linear_algebra::solve(
         jacobian, value.template cast<Float>());
 
+    Eigen::VectorXd diff = result - previous_result;
+
     at = result;
-    auto n = norm(f, nld::at(at));
-    return n < tolerance;
+    // std::cout << "Newton step: "
+    //           << "111" << std::endl;
+    auto nf = norm(f, nld::at(at));
+    auto na = diff.norm() / result.norm();
+    // std::cout << "Norm f: " << nf << " Norm a: " << na
+    //           << " Norm arg: " << result.norm() << std::endl;
+    return nf < tolerance || na < tolerance;
 }
 
 /// Implementation of Moore-Penrose-Newton step

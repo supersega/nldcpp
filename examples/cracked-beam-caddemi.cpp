@@ -673,7 +673,8 @@ private:
             auto mode_raw = [&, i](auto xi) { return mode(i, xi); };
             auto distance = nld::integrate<nld::gauss_kronrod21>(
                 [&mode_raw](auto xi) { return mode_raw(xi) * mode_raw(xi); },
-                nld::segment{0.0, 1.0});
+                nld::segment{0.0, 1.0},
+                nld::gauss_kronrod21::integration_options{1.0e-6, 1.0e-6});
             factors(i) = 1.0 / sqrt(distance);
         }
         normalization_factors = factors;
@@ -821,7 +822,8 @@ private:
                     return traits.Phi(i)(xi) * traits.Phi(j)(xi);
                 };
                 mass(i, j) = nld::integrate<nld::gauss_kronrod21>(
-                    fn, nld::segment{0.0, 1.0});
+                    fn, nld::segment{0.0, 1.0},
+                    nld::gauss_kronrod21::integration_options{1.0e-6, 1.0e-6});
             }
         }
 
@@ -909,9 +911,13 @@ private:
                         };
 
                         auto R_ij = nld::integrate<nld::gauss_kronrod21>(
-                            make_integrand(i, j), nld::segment{0.0, 1.0});
+                            make_integrand(i, j), nld::segment{0.0, 1.0},
+                            nld::gauss_kronrod21::integration_options{1.0e-6,
+                                                                      1.0e-6});
                         auto R_kl = nld::integrate<nld::gauss_kronrod21>(
-                            make_integrand(k, l), nld::segment{0.0, 1.0});
+                            make_integrand(k, l), nld::segment{0.0, 1.0},
+                            nld::gauss_kronrod21::integration_options{1.0e-6,
+                                                                      1.0e-6});
 
                         auto R_bar_ijkl = (h * h / Omega0 / Omega0) * (E * A) /
                                           2.0 / pow(L, 5) * R_ij * R_kl;
@@ -953,9 +959,10 @@ private:
 
                     auto xij = cracks_positions_dimless[j];
                     auto R_ij =
-                        1.0 *
-                        nld::integrate<nld::gauss_kronrod21>(
-                            S_ijnm, nld::segment{std::max(xii, xij), 1.0});
+                        1.0 * nld::integrate<nld::gauss_kronrod21>(
+                                  S_ijnm, nld::segment{std::max(xii, xij), 1.0},
+                                  nld::gauss_kronrod21::integration_options{
+                                      1.0e-6, 1.0e-6});
 
                     auto a = [](auto ii, auto jj) -> double {
                         if (jj < ii)
@@ -996,15 +1003,21 @@ private:
                 };
 
                 R_nm += 1.0 * nld::integrate<nld::gauss_kronrod21>(
-                                  R1_aux, nld::segment{xii, 1.0});
+                                  R1_aux, nld::segment{xii, 1.0},
+                                  nld::gauss_kronrod21::integration_options{
+                                      1.0e-6, 1.0e-6});
                 R_nm += 1.0 * nld::integrate<nld::gauss_kronrod21>(
-                                  R2_aux, nld::segment{xii, 1.0});
+                                  R2_aux, nld::segment{xii, 1.0},
+                                  nld::gauss_kronrod21::integration_options{
+                                      1.0e-6, 1.0e-6});
                 R_nm += 1.0 * nld::integrate<nld::gauss_kronrod21>(
                                   [&](auto xi) {
                                       return cracked_beam_traits.dbetta(n)(xi) *
                                              cracked_beam_traits.dbetta(m)(xi);
                                   },
-                                  nld::segment{0, 1.0});
+                                  nld::segment{0, 1.0},
+                                  nld::gauss_kronrod21::integration_options{
+                                      1.0e-6, 1.0e-6});
             }
             return R_nm;
         };
@@ -1063,8 +1076,9 @@ void integrate_eigen_mode(CrackedBeam cracked_beam) {
     auto fem = make_eigen_mode_hc(cracked_beam, 0);
     auto sem = make_eigen_mode_hc(cracked_beam, 1);
     auto mass = [=](auto xi) mutable { return sem(xi) * fem(xi); };
-    auto value =
-        nld::integrate<nld::gauss_kronrod21>(mass, nld::segment{0.0, 1.0});
+    auto value = nld::integrate<nld::gauss_kronrod21>(
+        mass, nld::segment{0.0, 1.0},
+        nld::gauss_kronrod21::integration_options{1.0e-6, 1.0e-6});
 }
 
 auto make_eigen_mode_no_krack(size_t index) {
@@ -1091,8 +1105,9 @@ void integrate_eigen_mode2(CrackedBeam cracked_beam) {
     auto fem = make_eigen_mode_no_krack(0);
     auto sem = make_eigen_mode_no_krack(1);
     auto mass = [=](auto xi) mutable { return sem(xi) * fem(xi); };
-    auto value =
-        nld::integrate<nld::gauss_kronrod21>(mass, nld::segment{0.0, 1.0});
+    auto value = nld::integrate<nld::gauss_kronrod21>(
+        mass, nld::segment{0.0, 1.0},
+        nld::gauss_kronrod21::integration_options{1.0e-6, 1.0e-6});
 }
 
 void remove_element(auto &v, unsigned int index) {

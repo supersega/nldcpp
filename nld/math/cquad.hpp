@@ -3,8 +3,11 @@
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_integration.h>
 
+#include <functional>
+#include <memory>
 #include <nld/core.hpp>
 
+#include <nld/math/concepts.hpp>
 #include <nld/math/segment.hpp>
 
 namespace nld {
@@ -13,14 +16,14 @@ namespace nld {
 /// @details The quad integration based on GSL library.
 /// GSL has a good quality of integration, so it is better
 /// to use 3rd party for such things.
-struct gauss_kronrod21 final {
-    /// @brief Integration options for gauss_kronrod21.
+struct cquad final {
+    /// @brief Integration options for cquad.
     struct integration_options {
         double absolute_tolerance =
             1.49e-8; ///< Absolute integration tolerance.
         double relative_tolerance =
-            1.49e-8;                       ///< Relative integration tolerance.
-        std::size_t max_iterations = 1000; ///< Limit of iterations.
+            1.49e-8;               ///< Relative integration tolerance.
+        std::size_t intervals = 3; ///< Limit of intervals.
     };
 
     /// @brief The integration function.
@@ -31,13 +34,12 @@ struct gauss_kronrod21 final {
     /// @param options An integration options.
     /// @param args The additional arguments to function.
     /// @return The value of the integral.
-    template <typename F, typename T>
-    static auto integrate(F function, segment domain,
-                          nld::gauss_kronrod21::integration_options options,
-                          T &&args) {
-        using workspace =
-            std::unique_ptr<gsl_integration_workspace,
-                            std::function<void(gsl_integration_workspace *)>>;
+    template <typename F, Domain1d D, typename T>
+    static auto integrate(F function, D domain,
+                          cquad::integration_options options, T &&args) {
+        using workspace = std::unique_ptr<
+            gsl_integration_cquad_workspace,
+            std::function<void(gsl_integration_cquad_workspace *)>>;
         struct context {
             F function;
             T &&args;
@@ -55,12 +57,12 @@ struct gauss_kronrod21 final {
         gsl_f.params = std::addressof(ctx);
 
         double result, error;
-        workspace ws(gsl_integration_workspace_alloc(options.max_iterations),
-                     gsl_integration_workspace_free);
-        gsl_integration_qags(&gsl_f, domain.begin, domain.end,
-                             options.absolute_tolerance,
-                             options.relative_tolerance, options.max_iterations,
-                             ws.get(), &result, &error);
+        std::size_t neval;
+        workspace ws(gsl_integration_cquad_workspace_alloc(options.intervals),
+                     gsl_integration_cquad_workspace_free);
+        gsl_integration_cquad(
+            &gsl_f, domain.begin, domain.end, options.absolute_tolerance,
+            options.relative_tolerance, ws.get(), &result, &error, &neval);
 
         return result;
     }

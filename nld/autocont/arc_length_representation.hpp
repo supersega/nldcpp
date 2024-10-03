@@ -90,8 +90,7 @@ struct arc_length_representation final {
         auto value = v.head(dim - 1);
 
         auto keller = [this](auto &val) { return arc_length_equation(val); };
-        auto dkeller =
-            autodiff::gradient(keller, nld::wrt(at), nld::at(at), v(dim - 1));
+        auto dkeller = nld::math::detail::gradient(keller, at, v(dim - 1));
 
         auto top_left = function.jacobian(at, value);
         detail::build_matrix(top_left, dkeller);

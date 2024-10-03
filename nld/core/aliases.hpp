@@ -40,8 +40,9 @@ template <typename Real, int Size = -1>
 using matrix_x = Eigen::Matrix<Real, Size, Size, 0, Size, Size>;
 using matrix_xd = matrix_x<double>;
 
-template <int Size = -1>
-using matrix_xdd = Eigen::Matrix<dual, Size, Size, 0, Size, Size>;
+using matrix_xdd = matrix_x<dual>;
+
+using matrix_xdcd = Eigen::Matrix<std::complex<dual>, -1, -1>;
 
 using sparse_matrix_xd = Eigen::SparseMatrix<double>;
 

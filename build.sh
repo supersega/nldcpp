@@ -42,6 +42,7 @@ do
         --build_examples)  BUILD_EXAMPLES=TRUE;;
         --build_python)    BUILD_PYTHON=TRUE;;
         --build_all)       BUILD_TESTS=TRUE; BUILD_EXAMPLES=TRUE; BUILD_PYTHON=TRUE;;
+        --target)          TARGET=$2; shift;;
         *) >&2 log_error  "Unsupported option: $1"
             print_help;;
 	esac
@@ -65,6 +66,7 @@ enable_asan="${ENABLE_ASAN:-FALSE}"
 build_tests="${BUILD_TESTS:-FALSE}"
 build_examples="${BUILD_EXAMPLES:-FALSE}"
 build_python="${BUILD_PYTHON:-FALSE}"
+target="${TARGET:-all}"
 
 $cmake \
     --no-warn-unused-cli \
@@ -80,5 +82,5 @@ $cmake \
     -B $build_dir \
     -G "Unix Makefiles"
 
-$cmake --build $build_dir --config $build_type --target all
+$cmake --build $build_dir --config $build_type --target $target
 

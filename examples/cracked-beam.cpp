@@ -110,7 +110,7 @@ struct cracked_flexible_beam_dynamic_system final {
         std::array dimensions = {Eigen::IndexPair(0, 1)};
 
         nld::tensor_expression_calculator<nld::gauss_kronrod21> calculator(
-            nld::integration_options{1.0e-4, 1.0e-4, 300});
+            nld::gauss_kronrod21::integration_options{1.0e-4, 1.0e-4, 300});
 
         auto rho = material.density;
         auto A = geometry.height * geometry.width;
@@ -140,7 +140,7 @@ struct cracked_flexible_beam_dynamic_system final {
             E * I * nld::laplacian(u) * nld::laplacian(u), domain);
         auto epnc = nld::solve_eigenvalue_problem<nld::gauss_kronrod21>(
             kinetic_energy_no_crack, potential_energy_no_crack,
-            nld::integration_options{1.0e-4, 1.0e-4, 300});
+            nld::gauss_kronrod21::integration_options{1.0e-4, 1.0e-4, 300});
         auto efnc = epnc.eigenvalues.cwiseSqrt();
         decltype(auto) eigenvectors_no_crack =
             sqrt(rho * A) * epnc.eigenvectors;
@@ -187,7 +187,7 @@ struct cracked_flexible_beam_dynamic_system final {
             nld::integral(E * I * Q * laplacian(u) * laplacian(u), domain);
         auto epc = nld::solve_eigenvalue_problem<nld::gauss_kronrod21>(
             kinetic_energy_crack, potential_energy_crack,
-            nld::integration_options{1.0e-3, 1.0e-3, 500});
+            nld::gauss_kronrod21::integration_options{1.0e-3, 1.0e-3, 500});
         auto efc = epc.eigenvalues.cwiseSqrt();
         decltype(auto) eigenvectors_crack = sqrt(rho * A) * epc.eigenvectors;
 

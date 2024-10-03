@@ -4,6 +4,7 @@
 #include <nld/systems/dimension.hpp>
 #include <nld/systems/equilibrium.hpp>
 #include <nld/systems/first_guess.hpp>
+#include <nld/systems/generalized_bolotin_method.hpp>
 #include <nld/systems/homotopy.hpp>
 #include <nld/systems/integration_arguments.hpp>
 #include <nld/systems/jacobian_mixin.hpp>

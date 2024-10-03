@@ -1,5 +1,6 @@
 #pragma once
 
+#include <nld/calculus/adnum.hpp>
 #include <nld/core.hpp>
 
 namespace nld {
@@ -22,11 +23,14 @@ struct eigenfunctions final {
     /// function at point x.
     auto value(nld::index i) const {
         return [this, i](auto x) -> adnum {
+            constexpr double epsilon = 1e-8;
             auto eigenvector = this->eigenvectors.col(i);
 
             adnum acc = 0.0;
-            for (nld::index j = 0; j < eigenvector.size(); j++)
-                acc += eigenvector(j) * this->test_functions.value(j)(x);
+            for (nld::index j = 0; j < eigenvector.size(); j++) {
+                auto tfx = this->test_functions.value(j)(x);
+                acc += eigenvector(j) * tfx;
+            }
 
             return acc;
         };
