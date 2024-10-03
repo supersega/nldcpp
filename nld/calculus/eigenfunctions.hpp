@@ -9,6 +9,9 @@ template <typename T>
 struct eigenfunctions final {
     static constexpr nld::index dimension = 1;
 
+    /// @brief Tensor size of eigenfunctions.
+    static constexpr nld::index tensor_size = 1;
+
     /// @brief Construct a new eigenfunctions object.
     /// @param test_functions The test functions.
     /// @param eigenvectors The eigenvectors.

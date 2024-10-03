@@ -19,14 +19,6 @@ struct tensor_mul final {
     using left_t = std::remove_reference_t<L>;
     using right_t = std::remove_reference_t<R>;
 
-    /// @brief Tensor size of mul expression.
-    static constexpr std::size_t tensor_size =
-        nld::tensor_size<left_t>::size + nld::tensor_size<right_t>::size;
-
-    /// @brief Tensor size of mul expression.
-    // static constexpr std::size_t size =
-    //     tensor_size<left_t>::size + tensor_size<right_t>::size;
-
     /// @brief Function what computes value of tensor expression.
     /// @param indicies Tensor indicies.
     /// @return Function what computes value of tensor expression.
@@ -113,10 +105,6 @@ struct tensor_mul final {
 /// @brief The Dirac shift expression expression holds left and right nodes.
 template <typename E, typename D>
 struct dirac_shift final {
-    /// @brief Tensor size of Dirac shift expression.
-    static constexpr std::size_t tensor_size =
-        std::remove_reference_t<E>::tensor_size;
-
     /// @brief Construct a new dirac shift object
     /// @param e expression.
     /// @param d delta fuction.

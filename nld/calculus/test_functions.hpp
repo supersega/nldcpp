@@ -18,6 +18,9 @@ struct test_functions final {
     static constexpr nld::index dimension = std::tuple_size_v<Bases>;
     static constexpr bool with_subdomains = nld::AllWithSubdomains<Bases>;
 
+    /// @brief Tensor size of test functions.
+    static constexpr nld::index tensor_size = 1;
+
     /// @brief Create one dimension test functions.
     /// @tparam Basis bases tuple.
     /// @param basis bases tuple.

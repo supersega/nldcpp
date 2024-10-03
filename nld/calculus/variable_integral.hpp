@@ -11,6 +11,10 @@ namespace nld {
 template <typename E, typename I, FunctionalDomain1d D, typename O>
 struct variable_integral final {
     using expression_t = std::remove_reference_t<E>;
+
+    /// @brief Tensor size of integral expression.
+    static constexpr nld::index tensor_size = expression_t::tensor_size;
+
     /// @brief Construct a new integral object.
     /// @param e expression.
     explicit variable_integral(E &&e, I &&i, D &&d, O &&o)

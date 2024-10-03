@@ -12,6 +12,9 @@ template <typename E, typename W>
 struct derivative final {
     using expression_t = std::remove_reference_t<E>;
 
+    /// @brief Tensor size of derivative expression.
+    static constexpr nld::index tensor_size = expression_t::tensor_size;
+
     /// @brief The derivative order.
     constexpr static auto order_v = std::tuple_size_v<decltype(W::args)>;
 
