@@ -66,18 +66,72 @@ struct linear_parametric_system {
 
         auto integrator = nld::cquad{};
         auto inner_domain = nld::variable_domain{[](auto x) { return 0.0; },
-                                                 [l](auto x) { return l; }};
+                                                 [l](auto x) { return x; }};
         auto inner_integral = nld::variable_integral(
             U * U, integrator, inner_domain,
             nld::cquad::integration_options{1.0e-4, 1.0e-4, 300});
+        auto outer_domain = nld::variable_domain{[l](auto x) { return l; },
+                                                 [l](auto x) { return x; }};
+        auto outer_integral = nld::variable_integral(
+            inner_integral, integrator, outer_domain,
+            nld::cquad::integration_options{1.0e-4, 1.0e-4, 300});
 
-        auto Y_ = nld::integral(inner_integral, domain);
+        auto Y_ = nld::integral(outer_integral, domain);
         auto [Y_s] = calculator.calculate(Y_);
+
+        auto U4 = U * U * U * U;
+        auto fun = nld::integral(U * U * outer_integral, domain);
+        auto [Fun] = calculator.calculate(fun);
 
         Eigen::Map<Eigen::MatrixXd> M_(M.data(), dofs, dofs);
         Eigen::Map<Eigen::MatrixXd> K_0(K_s.data(), dofs, dofs);
         Eigen::Map<Eigen::MatrixXd> K_1(K_b.data(), dofs, dofs);
         Eigen::Map<Eigen::MatrixXd> Y(Y_s.data(), dofs, dofs);
+
+        auto Fun_0_analytical = -(2.0 / l) * (2.0 / l) *
+                                ((15.0 + 8.0 * M_PI * M_PI)) * l * l * l /
+                                (96.0 * M_PI * M_PI);
+
+        std::cout << "Fun_0_analytical: " << Fun_0_analytical << std::endl;
+
+        std::cout << "Fun: " << Fun << std::endl;
+
+        auto w1 = nld::scalar_function(
+            [l](nld::adnum s) -> nld::adnum { return s - l; });
+        auto w2 = nld::scalar_function(
+            [l](nld::adnum s2) -> nld::adnum { return s2 - l; });
+
+        auto inner_integral_simlified_1 = nld::variable_integral(
+            U * U, integrator, inner_domain,
+            nld::cquad::integration_options{1.0e-4, 1.0e-4, 300});
+
+        auto inner_domain_2 = nld::variable_domain{[l](auto x) { return x; },
+                                                   [l](auto x) { return l; }};
+
+        auto inner_integral_simlified_2 = nld::variable_integral(
+            w2 * U * U, integrator, inner_domain_2,
+            nld::cquad::integration_options{1.0e-4, 1.0e-4, 300});
+
+        auto fun_1_simlified =
+            nld::integral(w1 * U * U * inner_integral_simlified_1, domain);
+        auto fun_2_simlified =
+            nld::integral(U * U * inner_integral_simlified_2, domain);
+
+        auto [Fun_1_simlified] = calculator.calculate(fun_1_simlified);
+        auto [Fun_2_simlified] = calculator.calculate(fun_2_simlified);
+
+        std::cout << "Fun_1_simlified: " << Fun_1_simlified << std::endl;
+        std::cout << "Fun_2_simlified: " << Fun_2_simlified << std::endl;
+
+        nld::tensor<4> sum = Fun_1_simlified + Fun_2_simlified;
+
+        std::cout << "Sum: " << sum << std::endl;
+
+        auto sum_0 = sum(0, 0, 0, 0);
+        auto Fun_0 = Fun(0, 0, 0, 0);
+        auto diff = Fun_0 - sum_0;
+
+        std::cout << "diff: " << diff << std::endl;
 
         Eigen::MatrixXd K_0_hat = M_.inverse() * K_0 * Fcr / omega_0 / omega_0;
         Eigen::MatrixXd K_1_hat =
@@ -114,7 +168,7 @@ int main() {
     nld::mechanics::geometry g{558.7e-3, 5.0e-3, 11.95e-3};
     nld::mechanics::force f{1.0};
     nld::mechanics::beam b{g, p};
-    linear_parametric_system lps(b, f, 5);
+    linear_parametric_system lps(b, f, 2);
     lps.calculate_matricies();
     lps.print();
 }

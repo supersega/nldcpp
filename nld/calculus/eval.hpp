@@ -72,12 +72,73 @@ auto eval_impl(const E &mul, const D &domain, O options)
 template <typename I, typename E, typename D, typename O>
 auto eval_impl(const E &expr, const D &domain, O options)
     requires(tensor_size<E>::size == 3)
-{}
+{
+    auto [ni, nj, nk] = expr.count();
+    nld::tensor<3> result(nk, nj, ni);
+    for (nld::index i = 0; i < ni; i++)
+        for (nld::index j = 0; j < nj; j++)
+            for (nld::index k = 0; k < nk; k++) {
+                if constexpr (SubdomainDefined<E>) {
+                    nld::segment domain_{domain.begin, domain.end};
+                    auto subdomain = expr.subdomain(std::tuple(k, j, i));
+                    subdomain = subdomain ? domain_.intersect(*subdomain)
+                                          : std::nullopt;
+                    result(k, j, i) =
+                        subdomain
+                            ? nld::integrate<I>(
+                                  [k, j, i, &expr](auto... x) {
+                                      return static_cast<double>(expr.value(
+                                          std::tuple(k, j, i))(x...));
+                                  },
+                                  *subdomain, options)
+                            : 0.0;
+                } else {
+                    result(k, j, i) = nld::integrate<I>(
+                        [k, j, i, &expr](auto... x) {
+                            return static_cast<double>(
+                                expr.value(std::tuple(k, j, i))(x...));
+                        },
+                        domain, options);
+                }
+            }
+    return result;
+}
 
 template <typename I, typename E, typename D, typename O>
 auto eval_impl(const E &expr, const D &domain, O options)
     requires(tensor_size<E>::size == 4)
-{}
+{
+    auto [ni, nj, nk, nl] = expr.count();
+    nld::tensor<4> result(nl, nk, nj, ni);
+    for (nld::index i = 0; i < ni; i++)
+        for (nld::index j = 0; j < nj; j++)
+            for (nld::index k = 0; k < nk; k++)
+                for (nld::index l = 0; l < nl; l++) {
+                    if constexpr (SubdomainDefined<E>) {
+                        nld::segment domain_{domain.begin, domain.end};
+                        auto subdomain = expr.subdomain(std::tuple(l, k, j, i));
+                        subdomain = subdomain ? domain_.intersect(*subdomain)
+                                              : std::nullopt;
+                        result(l, k, j, i) =
+                            subdomain
+                                ? nld::integrate<I>(
+                                      [l, k, j, i, &expr](auto... x) {
+                                          return static_cast<double>(expr.value(
+                                              std::tuple(l, k, j, i))(x...));
+                                      },
+                                      *subdomain, options)
+                                : 0.0;
+                    } else {
+                        result(l, k, j, i) = nld::integrate<I>(
+                            [l, k, j, i, &expr](auto... x) {
+                                return static_cast<double>(
+                                    expr.value(std::tuple(l, k, j, i))(x...));
+                            },
+                            domain, options);
+                    }
+                }
+    return result;
+}
 
 template <typename I, typename E, typename D, typename O>
 auto eval(const E &expr, const D &domain, O options)
